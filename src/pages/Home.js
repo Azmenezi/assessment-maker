@@ -63,18 +63,20 @@ function Home() {
         Analytics
       </Button>
       <List>
-        {reports.map((report) => (
-          <ListItem
-            button
-            key={report.id}
-            onClick={() => navigate(`/edit/${report.id}`)}
-          >
-            <ListItemText
-              primary={`${report.projectName} - v${report.version} (${report.assessmentType})`}
-              secondary={`${report.startDate} - ${report.endDate}`}
-            />
-          </ListItem>
-        ))}
+        {reports
+          .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
+          .map((report) => (
+            <ListItem
+              button
+              key={report.id}
+              onClick={() => navigate(`/edit/${report.id}`)}
+            >
+              <ListItemText
+                primary={`${report.projectName} - v${report.version} (${report.assessmentType})`}
+                secondary={`${report.startDate} - ${report.endDate}`}
+              />
+            </ListItem>
+          ))}
       </List>
     </Container>
   );
