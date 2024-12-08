@@ -7,20 +7,24 @@ function TemplatesPage() {
     executiveSummary,
     scope,
     methodology,
+    assessorName,
     setExecutiveSummary,
     setScope,
     setMethodology,
+    setAssessorName,
   } = useTemplatesStore();
 
   const [localExecutiveSummary, setLocalExecutiveSummary] =
     useState(executiveSummary);
   const [localScope, setLocalScope] = useState(scope);
   const [localMethodology, setLocalMethodology] = useState(methodology);
+  const [localAssessorName, setLocalAssessorName] = useState(assessorName);
 
   const handleSave = () => {
     setExecutiveSummary(localExecutiveSummary);
     setScope(localScope);
     setMethodology(localMethodology);
+    setAssessorName(localAssessorName);
     alert("Templates saved!");
   };
 
@@ -57,6 +61,13 @@ function TemplatesPage() {
         margin="normal"
         value={localMethodology}
         onChange={(e) => setLocalMethodology(e.target.value)}
+      />
+      <Typography variant="h6">Assessor Name</Typography>
+      <TextField
+        fullWidth
+        margin="normal"
+        value={localAssessorName}
+        onChange={(e) => setLocalAssessorName(e.target.value)}
       />
 
       <Button variant="contained" color="primary" onClick={handleSave}>

@@ -30,7 +30,7 @@ export async function exportReportToPDF(report, settings) {
   // Calculate severity counts
   const counts = {
     critical: findings.filter((f) => f.severity === "Critical").length,
-    high: findings.filter((f) => f.severity === "HIGH").length,
+    high: findings.filter((f) => f.severity === "High").length,
     medium: findings.filter((f) => f.severity === "Medium").length,
     low: findings.filter((f) => f.severity === "Low").length,
     informational: findings.filter((f) => f.severity === "Informational")
@@ -71,19 +71,63 @@ export async function exportReportToPDF(report, settings) {
     findingsTableBody.push([
       {
         text: (index + 1).toString(),
-        fillColor: ratingColor === "black" ? "" : ratingColor,
+        fillColor:
+          f.severity === "Critical"
+            ? "#940000"
+            : f.severity === "High"
+            ? "#FF0000"
+            : f.severity === "Medium"
+            ? "#FFA500"
+            : f.severity === "Low"
+            ? "#FFFF00"
+            : f.severity === "Informational"
+            ? "#ADD8E6"
+            : "",
       },
       {
         text: f.title,
-        fillColor: ratingColor === "black" ? "" : ratingColor,
+        fillColor:
+          f.severity === "Critical"
+            ? "#940000"
+            : f.severity === "High"
+            ? "#FF0000"
+            : f.severity === "Medium"
+            ? "#FFA500"
+            : f.severity === "Low"
+            ? "#FFFF00"
+            : f.severity === "Informational"
+            ? "#ADD8E6"
+            : "",
       },
       {
         text: f.severity,
-        fillColor: ratingColor === "black" ? "" : ratingColor,
+        fillColor:
+          f.severity === "Critical"
+            ? "#940000"
+            : f.severity === "High"
+            ? "#FF0000"
+            : f.severity === "Medium"
+            ? "#FFA500"
+            : f.severity === "Low"
+            ? "#FFFF00"
+            : f.severity === "Informational"
+            ? "#ADD8E6"
+            : "",
       },
       {
         text: f.status || "OPEN",
-        fillColor: ratingColor === "black" ? "" : ratingColor,
+        fillColor:
+          f.severity === "Critical"
+            ? "#940000"
+            : f.severity === "High"
+            ? "#FF0000"
+            : f.severity === "Medium"
+            ? "#FFA500"
+            : f.severity === "Low"
+            ? "#FFFF00"
+            : f.severity === "Informational"
+            ? "#ADD8E6"
+            : "",
       },
     ]);
   });
@@ -185,7 +229,11 @@ export async function exportReportToPDF(report, settings) {
   content.push({ text: "", pageBreak: "after" });
 
   // Executive Summary & Scope
-  content.push({ text: "1. Executive Summary", style: "sectionHeader" });
+  content.push({
+    text: "1. Executive Summary",
+    style: "sectionHeader",
+    margin: [0, 20, 0, 20],
+  });
   content.push({ text: "1.1 Assessment Overview", style: "subSectionHeader" });
   content.push({
     text: `The assessment of ${projectName} commenced on ${startDate} and concluded on ${endDate}. This assessment was requested by Digital Factory Division in order to identify any final concerns prior to the standard being finalized and published.
@@ -235,6 +283,7 @@ The results provided are the output of the security assessment performed and sho
   });
   content.push({ text: methodology, style: "normal" });
 
+  content.push({ text: "", pageBreak: "after" });
   // Detailed Findings Section
   content.push({
     text: "3. Detailed Finding:",
@@ -298,16 +347,22 @@ The results provided are the output of the security assessment performed and sho
       style: "normal",
       margin: [0, 5, 0, 0],
     });
-    content.push({
-      text: `Impact: ${finding.impact}`,
-      style: "normal",
-      margin: [0, 5, 0, 0],
-    });
-    content.push({
-      text: `Mitigation: ${finding.mitigation}`,
-      style: "normal",
-      margin: [0, 5, 0, 10],
-    });
+    {
+      finding.impact &&
+        content.push({
+          text: `Impact: ${finding.impact}`,
+          style: "normal",
+          margin: [0, 5, 0, 0],
+        });
+    }
+    {
+      finding.mitigation &&
+        content.push({
+          text: `Mitigation: ${finding.mitigation}`,
+          style: "normal",
+          margin: [0, 5, 0, 10],
+        });
+    }
 
     // PoC Images
     if (finding.pocImages && finding.pocImages.length > 0) {
@@ -319,7 +374,7 @@ The results provided are the output of the security assessment performed and sho
       finding.pocImages.forEach((img) => {
         content.push({
           image: img.data,
-          width: 300,
+          width: 500,
           margin: [0, 5, 0, 10],
         });
       });

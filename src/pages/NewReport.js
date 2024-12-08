@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 
 function NewReport() {
   const createReport = useReportsStore((state) => state.createReport);
-  const { executiveSummary, scope, methodology, conclusion } =
+  const { executiveSummary, scope, methodology, conclusion, assessorName } =
     useTemplatesStore();
 
   const [projectName, setProjectName] = useState("");
@@ -24,9 +24,7 @@ function NewReport() {
   const [endDate, setEndDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [assessorName, setAssessorName] = useState(
-    "Abdulaziz Mohammed Alenezi"
-  );
+  const [localAssessorName, setLocalAssessorName] = useState(assessorName);
   const [platform, setPlatform] = useState("Web Application");
   const [urls, setUrls] = useState("");
   const [credentials, setCredentials] = useState("N/A");
@@ -40,7 +38,7 @@ function NewReport() {
       assessmentType,
       startDate,
       endDate,
-      assessorName,
+      assessorName: localAssessorName,
       scope,
       methodology,
       executiveSummary,
@@ -105,8 +103,8 @@ function NewReport() {
         label="Assessor Name"
         fullWidth
         margin="normal"
-        value={assessorName}
-        onChange={(e) => setAssessorName(e.target.value)}
+        value={localAssessorName}
+        onChange={(e) => localAssessorName(e.target.value)}
       />
 
       <TextField
