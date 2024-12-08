@@ -55,10 +55,26 @@ function NewReport() {
   };
 
   return (
-    <Container>
-      <Typography variant="h5" gutterBottom>
+    <Container style={{ paddingBottom: 40 }}>
+      <Typography marginTop={4} variant="h5" gutterBottom>
         New Report
       </Typography>
+      <TextField
+        type="date"
+        label="From Date"
+        InputLabelProps={{ shrink: true }}
+        style={{ marginRight: "10px" }}
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+      />
+      <TextField
+        type="date"
+        label="End Date"
+        InputLabelProps={{ shrink: true }}
+        style={{ marginRight: "10px" }}
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+      />
       <TextField
         label="Project Name"
         fullWidth
@@ -84,24 +100,7 @@ function NewReport() {
         <MenuItem value="Initial">Initial</MenuItem>
         <MenuItem value="Reassessment">Reassessment</MenuItem>
       </TextField>
-      <TextField
-        type="date"
-        label="Start Date"
-        fullWidth
-        margin="normal"
-        InputLabelProps={{ shrink: true }}
-        value={startDate}
-        onChange={(e) => setStartDate(e.target.value)}
-      />
-      <TextField
-        type="date"
-        label="End Date"
-        fullWidth
-        margin="normal"
-        InputLabelProps={{ shrink: true }}
-        value={endDate}
-        onChange={(e) => setEndDate(e.target.value)}
-      />
+
       <TextField
         label="Assessor Name"
         fullWidth

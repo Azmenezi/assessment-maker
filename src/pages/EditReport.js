@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import useReportsStore from "../store/useReportsStore";
 import {
   Container,
@@ -43,6 +43,7 @@ function TabPanel(props) {
 
 function EditReport() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const getReportById = useReportsStore((state) => state.getReportById);
   const updateReport = useReportsStore((state) => state.updateReport);
   const { defaultLogo } = useSettingsStore();
@@ -236,7 +237,7 @@ function EditReport() {
   };
 
   return (
-    <Container>
+    <Container style={{ paddingBottom: 40 }}>
       {report ? (
         <>
           <Typography variant="h4" gutterBottom>
@@ -569,6 +570,23 @@ function EditReport() {
               style={{ marginLeft: "10px" }}
             >
               Export Word
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => {
+                if (
+                  window.confirm("Are you sure you want to delete this report?")
+                ) {
+                  useReportsStore.getState().deleteReport(id);
+                  alert("Report deleted!");
+                  navigate("/");
+                }
+              }}
+              style={{ marginLeft: "10px" }}
+            >
+              Delete
             </Button>
           </Box>
         </>
