@@ -21,7 +21,21 @@ const useReportsStore = create((set, get) => ({
       const updatedReports = state.reports.map((r) =>
         r.id === id ? { ...r, ...updatedData } : r
       );
-      localStorage.setItem(localStorageKey, JSON.stringify(updatedReports));
+      const noPoCReports = updatedReports.map((report) => {
+        const newFindings = report.detailedFindings.map((finding) => {
+          return {
+            ...finding,
+            pocImages: finding.pocImages.map((img) => {
+              return { name: img.name };
+            }),
+          };
+        });
+        return {
+          ...report,
+          detailedFindings: newFindings,
+        };
+      });
+      localStorage.setItem(localStorageKey, JSON.stringify(noPoCReports));
       return { reports: updatedReports };
     });
   },

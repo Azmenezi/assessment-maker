@@ -17,6 +17,11 @@ import {
   TableRow,
   IconButton,
   Switch,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Select,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -24,13 +29,6 @@ import useSettingsStore from "../store/useSettingsStore";
 import { exportReportToPDF } from "../utils/exportPDF";
 import { exportReportToWord } from "../utils/exportWord";
 import useFindingsLibraryStore from "../store/useFindingsLibraryStore";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-} from "@mui/material";
-import Select from "@mui/material/Select";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -51,7 +49,8 @@ function EditReport() {
 
   const [tabValue, setTabValue] = useState(0);
 
-  const { findings: libraryFindings } = useFindingsLibraryStore();
+  const { findings: libraryFindings, addFindingToLibrary } =
+    useFindingsLibraryStore();
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedLibIndex, setSelectedLibIndex] = useState("");
 
@@ -66,7 +65,7 @@ function EditReport() {
     }
   };
 
-  // Local states to hold report data while editing
+  // Local states for report details
   const [projectName, setProjectName] = useState("");
   const [version, setVersion] = useState("");
   const [assessmentType, setAssessmentType] = useState("Initial");
@@ -126,15 +125,13 @@ function EditReport() {
       urls,
       credentials,
     });
-    //add all new findings to the library but do not duplicate
+    // Add new findings to library if not duplicate
     for (const finding of detailedFindings) {
       const exists = libraryFindings.some(
         (lf) => lf.title === finding.title && lf.severity === finding.severity
       );
       if (!exists) {
-        useFindingsLibraryStore.setState((state) => ({
-          findings: [...state.findings, finding],
-        }));
+        addFindingToLibrary({ ...finding, status: "OPEN", pocImages: [] });
       }
     }
 
@@ -202,9 +199,7 @@ function EditReport() {
     setTabValue(newValue);
   };
 
-  // Handling Findings
   const severities = ["Critical", "High", "Medium", "Low", "Informational"];
-
   const [newFinding, setNewFinding] = useState({
     title: "",
     category: "",
@@ -236,6 +231,9 @@ function EditReport() {
     setDetailedFindings(updated);
   };
 
+  // State for selected finding details dialog
+  const [selectedFinding, setSelectedFinding] = useState(null);
+
   return (
     <Container style={{ paddingBottom: 40 }}>
       {report ? (
@@ -246,9 +244,7 @@ function EditReport() {
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
             <Tabs value={tabValue} onChange={handleChangeTab}>
               <Tab label="Details" />
-              {/* <Tab label="Executive Summary & Scope" /> */}
               <Tab label="Findings" />
-              {/* <Tab label="Conclusion" /> */}
             </Tabs>
           </Box>
 
@@ -329,37 +325,6 @@ function EditReport() {
             />
           </TabPanel>
 
-          {/* Executive Summary & Scope Tab */}
-          {/* <TabPanel value={tabValue} index={1}>
-            <Typography variant="h6">Executive Summary</Typography>
-            <TextField
-              multiline
-              rows={4}
-              fullWidth
-              margin="normal"
-              value={executiveSummary}
-              onChange={(e) => setExecutiveSummary(e.target.value)}
-            />
-            <Typography variant="h6">Scope</Typography>
-            <TextField
-              multiline
-              rows={4}
-              fullWidth
-              margin="normal"
-              value={scope}
-              onChange={(e) => setScope(e.target.value)}
-            />
-            <Typography variant="h6">Methodology</Typography>
-            <TextField
-              multiline
-              rows={4}
-              fullWidth
-              margin="normal"
-              value={methodology}
-              onChange={(e) => setMethodology(e.target.value)}
-            />
-          </TabPanel> */}
-
           {/* Findings Tab */}
           <TabPanel value={tabValue} index={1}>
             <Typography variant="h5" style={{ marginTop: "20px" }}>
@@ -377,20 +342,31 @@ function EditReport() {
               </TableHead>
               <TableBody>
                 {detailedFindings.map((f, index) => (
-                  <TableRow key={index}>
+                  <TableRow
+                    key={index}
+                    hover
+                    onClick={() => setSelectedFinding(f)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{f.title}</TableCell>
                     <TableCell>{f.severity}</TableCell>
                     <TableCell>
                       <Switch
                         checked={f.status === "OPEN"}
-                        onChange={() => handleStatusToggle(index)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleStatusToggle(index);
+                        }}
                         color="primary"
                       />
-                      {console.log(f)}
                       {f.status}
                     </TableCell>
-                    <TableCell>
+                    <TableCell
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
                       <IconButton onClick={() => deleteFinding(index)}>
                         <DeleteIcon />
                       </IconButton>
@@ -538,19 +514,6 @@ function EditReport() {
             </Box>
           </TabPanel>
 
-          {/* Conclusion Tab */}
-          <TabPanel value={tabValue} index={3}>
-            <Typography variant="h6">Conclusion</Typography>
-            <TextField
-              multiline
-              rows={4}
-              fullWidth
-              margin="normal"
-              value={conclusion}
-              onChange={(e) => setConclusion(e.target.value)}
-            />
-          </TabPanel>
-
           <Box mt={2}>
             <Button variant="contained" color="primary" onClick={handleSave}>
               Save
@@ -589,6 +552,60 @@ function EditReport() {
               Delete
             </Button>
           </Box>
+
+          {/* Dialog for selected finding details */}
+          {selectedFinding && (
+            <Dialog open={true} onClose={() => setSelectedFinding(null)}>
+              <DialogTitle>{selectedFinding.title}</DialogTitle>
+              <DialogContent>
+                <Typography variant="subtitle1">
+                  Category: {selectedFinding.category}
+                </Typography>
+                <Typography variant="subtitle1">
+                  Severity: {selectedFinding.severity}
+                </Typography>
+                <Typography variant="subtitle1" style={{ marginTop: 10 }}>
+                  Description:
+                </Typography>
+                <Typography variant="body2">
+                  {selectedFinding.description}
+                </Typography>
+                <Typography variant="subtitle1" style={{ marginTop: 10 }}>
+                  Impact:
+                </Typography>
+                <Typography variant="body2">
+                  {selectedFinding.impact}
+                </Typography>
+                <Typography variant="subtitle1" style={{ marginTop: 10 }}>
+                  Mitigation:
+                </Typography>
+                <Typography variant="body2">
+                  {selectedFinding.mitigation}
+                </Typography>
+                {selectedFinding.pocImages &&
+                  selectedFinding.pocImages.length > 0 && (
+                    <>
+                      <Typography variant="subtitle1" style={{ marginTop: 10 }}>
+                        PoC Images:
+                      </Typography>
+                      {selectedFinding.pocImages.map((img, idx) => (
+                        <Box key={idx} mt={1}>
+                          <Typography variant="body2">{img.name}</Typography>
+                          <img
+                            src={img.data}
+                            alt={img.name}
+                            style={{ maxWidth: "500px" }}
+                          />
+                        </Box>
+                      ))}
+                    </>
+                  )}
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setSelectedFinding(null)}>Close</Button>
+              </DialogActions>
+            </Dialog>
+          )}
         </>
       ) : (
         <Typography variant="h6">Report not found</Typography>
