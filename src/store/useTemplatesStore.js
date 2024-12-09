@@ -5,7 +5,7 @@ const localStorageKey = "pentest_templates";
 const useTemplatesStore = create((set, get) => ({
   executiveSummary:
     JSON.parse(localStorage.getItem(localStorageKey))?.executiveSummary ||
-    "Default Executive Summary...",
+    "Azure protection list...",
   scope:
     JSON.parse(localStorage.getItem(localStorageKey))?.scope ||
     "This report holds the detailed finding(s) Critical findings.\nScope\nThe assessment was based on scope as defined in the Security Assessment Plan (SAP). White Box Penetration Testing.",

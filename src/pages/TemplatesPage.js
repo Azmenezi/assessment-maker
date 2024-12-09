@@ -33,7 +33,7 @@ function TemplatesPage() {
       <Typography variant="h4" gutterBottom>
         Templates
       </Typography>
-      <Typography variant="h6">Executive Summary Template</Typography>
+      <Typography variant="h6">Azure protection list Template</Typography>
       <TextField
         multiline
         rows={4}
