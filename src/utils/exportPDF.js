@@ -27,7 +27,21 @@ export async function exportReportToPDF(report, settings) {
   // Ensure detailedFindings is an array
   const findings = Array.isArray(detailedFindings) ? detailedFindings : [];
 
-  // Calculate severity counts
+  // Define severity order
+  const severityOrder = {
+    Critical: 1,
+    High: 2,
+    Medium: 3,
+    Low: 4,
+    Informational: 5,
+  };
+
+  // Sort the findings according to severity
+  findings.sort(
+    (a, b) => severityOrder[a.severity] - severityOrder[b.severity]
+  );
+
+  // Calculate severity counts after sorting (order doesn't affect counts, but we do it here anyway)
   const counts = {
     critical: findings.filter((f) => f.severity === "Critical").length,
     high: findings.filter((f) => f.severity === "High").length,
@@ -372,11 +386,12 @@ The results provided are the output of the security assessment performed and sho
         margin: [0, 5, 0, 2],
       });
       finding.pocImages.forEach((img) => {
-        content.push({
-          image: img.data,
-          width: 500,
-          margin: [0, 5, 0, 10],
-        });
+        img.data &&
+          content.push({
+            image: img.data,
+            width: 500,
+            margin: [0, 5, 0, 10],
+          });
       });
     }
   });
@@ -393,7 +408,11 @@ The results provided are the output of the security assessment performed and sho
       { text: " has completed a Security Assessment of ", style: "normal" },
       { text: projectName, bold: true, style: "normal" },
       {
-        text: " in accordance with: OWASP top 10, PCI-DSS, ISO 27001 and the result is Compliant.",
+        text: ` in accordance with: OWASP top 10, PCI-DSS, ISO 27001 and the result is ${
+          findings.find((f) => f.status == "OPEN")
+            ? "None Compliant"
+            : "Compliant"
+        }.`,
         style: "normal",
       },
     ],
