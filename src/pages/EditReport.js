@@ -317,8 +317,8 @@ function EditReport() {
     const folderName = projectName.replace(/\s+/g, "_");
     const folder = zip.folder(folderName);
 
-    folder.file(`${folderName}_report.pdf`, pdfBlob);
-    folder.file(`${folderName}_report.docx`, wordBlob);
+    folder.file(`${folderName}_${assessmentType}.pdf`, pdfBlob);
+    folder.file(`${folderName}_${assessmentType}.docx`, wordBlob);
 
     const imagesFolder = folder.folder("findingsImages");
     images.forEach((img) => {
@@ -327,7 +327,7 @@ function EditReport() {
     });
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
-    saveAs(zipBlob, `${folderName}.zip`);
+    saveAs(zipBlob, `${folderName}_${assessmentType}.zip`);
   };
 
   return (
