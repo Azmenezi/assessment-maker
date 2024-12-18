@@ -29,6 +29,9 @@ import useSettingsStore from "../store/useSettingsStore";
 import { exportReportToPDF } from "../utils/exportPDF";
 import { exportReportToWord } from "../utils/exportWord";
 import useFindingsLibraryStore from "../store/useFindingsLibraryStore";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import { Packer } from "docx";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -39,6 +42,19 @@ function TabPanel(props) {
   );
 }
 
+// Utility function to convert base64 image to binary
+function base64ToBinary(base64) {
+  // Remove prefix like "data:image/png;base64,"
+  const base64Data = base64.split(",")[1];
+  const binaryString = atob(base64Data);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 function EditReport() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -47,10 +63,11 @@ function EditReport() {
   const { defaultLogo } = useSettingsStore();
   const report = getReportById(id);
 
-  const [tabValue, setTabValue] = useState(0);
-
   const { findings: libraryFindings, addFindingToLibrary } =
     useFindingsLibraryStore();
+
+  const [tabValue, setTabValue] = useState(0);
+
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [selectedLibIndex, setSelectedLibIndex] = useState("");
 
@@ -233,6 +250,97 @@ function EditReport() {
 
   // State for selected finding details dialog
   const [selectedFinding, setSelectedFinding] = useState(null);
+
+  const handleExportZip = async () => {
+    if (!report) return alert("No report to export.");
+
+    // 1. Generate PDF Blob
+    const pdfBlob = await new Promise((resolve, reject) => {
+      const pdfData = {
+        ...report,
+        projectName,
+        version,
+        assessmentType,
+        startDate,
+        endDate,
+        assessorName,
+        executiveSummary,
+        scope,
+        methodology,
+        detailedFindings,
+        conclusion,
+        logo: report.logo,
+      };
+      const pdfDocGenerator = exportReportToPDF(pdfData, {
+        defaultLogo,
+        returnDoc: true,
+      });
+      // Modify exportReportToPDF to accept an option {returnDoc:true} that returns docDefinition or pdfDocGenerator instead of triggering download directly.
+      // Or you can refactor exportReportToPDF to always return a pdfDocGenerator and separate the download logic.
+
+      pdfDocGenerator.getBlob((blob) => resolve(blob));
+    });
+
+    // 2. Generate Word Blob
+    const wordBlob = await (async () => {
+      const wordData = {
+        ...report,
+        projectName,
+        version,
+        assessmentType,
+        startDate,
+        endDate,
+        assessorName,
+        executiveSummary,
+        scope,
+        methodology,
+        detailedFindings,
+        conclusion,
+        logo: report.logo,
+      };
+      const doc = await exportReportToWord(wordData, {
+        defaultLogo,
+        returnDoc: true,
+      });
+      // Similarly, modify exportReportToWord to return doc instead of downloading directly.
+      // doc is a Document object. Then do:
+      return Packer.toBlob(doc);
+    })();
+
+    // 3. Collect images from findings
+    const images = [];
+    detailedFindings.forEach((f, idx) => {
+      if (f.pocImages && f.pocImages.length > 0) {
+        f.pocImages.forEach((img, iidx) => {
+          img.data &&
+            images.push({
+              name: `finding_${idx + 1}_${f.title}`,
+              data: img.data,
+            });
+        });
+      }
+    });
+
+    // 4. Create zip
+    const zip = new JSZip();
+    const folderName = projectName.replace(/\s+/g, "_");
+    const folder = zip.folder(folderName);
+
+    // Add PDF and Word to main folder
+    folder.file(`${folderName}_report.pdf`, pdfBlob);
+    folder.file(`${folderName}_report.docx`, wordBlob);
+
+    // Add findingsImages subfolder
+    const imagesFolder = folder.folder("findingsImages");
+    images.forEach((img) => {
+      const binaryData = base64ToBinary(img.data);
+      imagesFolder.file(img.name, binaryData);
+    });
+
+    // 5. Generate zip and download
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    saveAs(zipBlob, `${folderName}.zip`);
+  };
 
   return (
     <Container style={{ paddingBottom: 40 }}>
@@ -533,6 +641,14 @@ function EditReport() {
               style={{ marginLeft: "10px" }}
             >
               Export Word
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              onClick={handleExportZip}
+              style={{ marginLeft: "10px" }}
+            >
+              Export ZIP
             </Button>
 
             <Button

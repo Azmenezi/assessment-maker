@@ -1,14 +1,19 @@
 import pdfMake from "pdfmake/build/pdfmake";
-// eslint-disable-next-line
 import pdfFonts from "pdfmake/build/vfs_fonts";
-// pdfMake.vfs = pdfFonts.pdfMake.vfs;
+console.log(pdfFonts);
+// Assign the default VFS fonts to pdfMake
+pdfMake.vfs = pdfFonts;
 
 /**
  * Export a report to PDF using pdfMake.
  * @param {Object} report - The report object.
  * @param {Object} settings - Global settings like defaultLogo.
  */
-export async function exportReportToPDF(report, settings) {
+export function exportReportToPDF(
+  report,
+  settings,
+  { returnDoc = false } = {}
+) {
   const {
     projectName,
     version,
@@ -23,7 +28,6 @@ export async function exportReportToPDF(report, settings) {
     credentials,
     detailedFindings,
   } = report;
-
   // Ensure detailedFindings is an array
   const findings = Array.isArray(detailedFindings) ? detailedFindings : [];
 
@@ -192,15 +196,24 @@ export async function exportReportToPDF(report, settings) {
     ],
   ];
 
+  // Only add image if settings.defaultLogo is a valid base64 string
   const content = [];
-
-  content.push({
-    image: settings.defaultLogo,
-    style: "title",
-    alignment: "center",
-    width: 200,
-    margin: [0, 50, 0, 20],
-  });
+  if (settings.defaultLogo && settings.defaultLogo.startsWith("data:image/")) {
+    content.push({
+      image: settings.defaultLogo,
+      style: "title",
+      alignment: "center",
+      width: 200,
+      margin: [0, 50, 0, 20],
+    });
+  } else {
+    content.push({
+      text: "Penetration Test Report",
+      style: "title",
+      alignment: "center",
+      margin: [0, 50, 0, 20],
+    });
+  }
   content.push({
     text: "Penetration Test Report",
     style: "title",
@@ -430,6 +443,7 @@ The results provided are the output of the security assessment performed and sho
             margin: [30, 20, 0, 10],
             style: "headerText",
           },
+
           {
             image: settings.defaultLogo,
             width: 50,
@@ -462,11 +476,17 @@ The results provided are the output of the security assessment performed and sho
       fontSize: 10,
     },
   };
-
   const pdfDocGenerator = pdfMake.createPdf(docDefinition);
-  pdfDocGenerator.download(
-    `${projectName.replace(/\s+/g, " ")} - Penetration Test Report_${
-      new Date().toISOString().split("T")[0]
-    }.pdf`
-  );
+
+  if (returnDoc) {
+    // Return the pdfDocGenerator so we can getBlob later
+    return pdfDocGenerator;
+  } else {
+    // Immediate download as before
+    pdfDocGenerator.download(
+      `${projectName.replace(/\s+/g, " ")} - Penetration Test Report_${
+        new Date().toISOString().split("T")[0]
+      }.pdf`
+    );
+  }
 }

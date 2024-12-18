@@ -83,7 +83,11 @@ function pageBreakParagraph() {
   return new Paragraph({ text: "", pageBreakBefore: true });
 }
 
-export async function exportReportToWord(report, settings) {
+export async function exportReportToWord(
+  report,
+  settings,
+  { returnDoc = false } = {}
+) {
   const {
     projectName,
     version,
@@ -461,16 +465,19 @@ export async function exportReportToWord(report, settings) {
     ],
   });
 
-  const day = new Date().getDate();
-  const blob = await Packer.toBlob(doc);
-  const fileName = `${projectName.replace(
-    /\s+/g,
-    " "
-  )} - Penetration Test Report_${day}.docx`;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
+  if (returnDoc) {
+    return doc; // Return the doc object for further processing
+  } else {
+    const blob = await Packer.toBlob(doc);
+    const fileName = `${report.projectName.replace(
+      /\s+/g,
+      " "
+    )}_Penetration_Test_Report.docx`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 }
