@@ -317,8 +317,18 @@ function EditReport() {
     const folderName = projectName.replace(/\s+/g, "_");
     const folder = zip.folder(folderName);
 
-    folder.file(`${folderName}_${assessmentType}.pdf`, pdfBlob);
-    folder.file(`${folderName}_${assessmentType}.docx`, wordBlob);
+    folder.file(
+      `${folderName}_${
+        assessmentType === "Initial" ? "assessment" : "reassessment"
+      }.pdf`,
+      pdfBlob
+    );
+    folder.file(
+      `${folderName}_${
+        assessmentType === "Initial" ? "assessment" : "reassessment"
+      }.docx`,
+      wordBlob
+    );
 
     const imagesFolder = folder.folder("findingsImages");
     images.forEach((img) => {
@@ -327,7 +337,12 @@ function EditReport() {
     });
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
-    saveAs(zipBlob, `${folderName}_${assessmentType}.zip`);
+    saveAs(
+      zipBlob,
+      `${folderName}_${
+        assessmentType === "Initial" ? "assessment" : "reassessment"
+      }.zip`
+    );
   };
 
   return (
