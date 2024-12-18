@@ -306,7 +306,7 @@ function EditReport() {
         f.pocImages.forEach((img, iidx) => {
           img.data &&
             images.push({
-              name: `finding_${idx + 1}_${f.title}.png`,
+              name: `finding_${iidx + 1}_${f.title}.png`,
               data: img.data,
             });
         });
