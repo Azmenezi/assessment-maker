@@ -254,9 +254,8 @@ function EditReport() {
   const handleExportZip = async () => {
     if (!report) return alert("No report to export.");
 
-    // 1. Generate PDF Blob
-    const pdfBlob = await new Promise((resolve, reject) => {
-      const pdfData = {
+    const pdfDocGenerator = exportReportToPDF(
+      {
         ...report,
         projectName,
         version,
@@ -270,20 +269,17 @@ function EditReport() {
         detailedFindings,
         conclusion,
         logo: report.logo,
-      };
-      const pdfDocGenerator = exportReportToPDF(pdfData, {
-        defaultLogo,
-        returnDoc: true,
-      });
-      // Modify exportReportToPDF to accept an option {returnDoc:true} that returns docDefinition or pdfDocGenerator instead of triggering download directly.
-      // Or you can refactor exportReportToPDF to always return a pdfDocGenerator and separate the download logic.
+      },
+      { defaultLogo },
+      { returnDoc: true } // get pdfDocGenerator
+    );
 
+    const pdfBlob = await new Promise((resolve) => {
       pdfDocGenerator.getBlob((blob) => resolve(blob));
     });
 
-    // 2. Generate Word Blob
-    const wordBlob = await (async () => {
-      const wordData = {
+    const doc = await exportReportToWord(
+      {
         ...report,
         projectName,
         version,
@@ -297,47 +293,39 @@ function EditReport() {
         detailedFindings,
         conclusion,
         logo: report.logo,
-      };
-      const doc = await exportReportToWord(wordData, {
-        defaultLogo,
-        returnDoc: true,
-      });
-      // Similarly, modify exportReportToWord to return doc instead of downloading directly.
-      // doc is a Document object. Then do:
-      return Packer.toBlob(doc);
-    })();
+      },
+      { defaultLogo },
+      { returnDoc: true } // get Document object
+    );
+    const wordBlob = await Packer.toBlob(doc);
 
-    // 3. Collect images from findings
+    // Collect images
     const images = [];
     detailedFindings.forEach((f, idx) => {
       if (f.pocImages && f.pocImages.length > 0) {
         f.pocImages.forEach((img, iidx) => {
           img.data &&
             images.push({
-              name: `finding_${idx + 1}_${f.title}`,
+              name: `finding_${idx + 1}_${f.title}.png`,
               data: img.data,
             });
         });
       }
     });
 
-    // 4. Create zip
     const zip = new JSZip();
     const folderName = projectName.replace(/\s+/g, "_");
     const folder = zip.folder(folderName);
 
-    // Add PDF and Word to main folder
     folder.file(`${folderName}_report.pdf`, pdfBlob);
     folder.file(`${folderName}_report.docx`, wordBlob);
 
-    // Add findingsImages subfolder
     const imagesFolder = folder.folder("findingsImages");
     images.forEach((img) => {
       const binaryData = base64ToBinary(img.data);
       imagesFolder.file(img.name, binaryData);
     });
 
-    // 5. Generate zip and download
     const zipBlob = await zip.generateAsync({ type: "blob" });
     saveAs(zipBlob, `${folderName}.zip`);
   };
