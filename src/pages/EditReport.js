@@ -340,7 +340,7 @@ function EditReport() {
     saveAs(
       zipBlob,
       `${folderName}_${
-        assessmentType === "Initial" ? "assessment" : "reassessment"
+        assessmentType === "Initial" ? "Assessment" : "Reassessment"
       }.zip`
     );
   };
