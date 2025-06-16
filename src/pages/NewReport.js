@@ -16,10 +16,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import useReportsStore from "../store/useReportsStore";
 import useTemplatesStore from "../store/useTemplatesStore";
+import { ToastContext } from "../App";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -31,6 +32,7 @@ function TabPanel(props) {
 }
 
 function NewReport() {
+  const toast = useContext(ToastContext);
   const createReport = useReportsStore((state) => state.createReport);
   const { executiveSummary, scope, methodology, conclusion, assessorName } =
     useTemplatesStore();
@@ -108,29 +110,57 @@ function NewReport() {
   };
 
   const handleCreate = () => {
+    // Validation for required fields
+    const requiredFields = [
+      { value: projectName.trim(), name: "Project Name" },
+      { value: version.trim(), name: "Version" },
+      { value: startDate, name: "Start Date" },
+      { value: endDate, name: "End Date" },
+      { value: localAssessorName.trim(), name: "Assessor Name" },
+      { value: platform.trim(), name: "Platform" },
+      { value: requestedBy.trim(), name: "Requested By" },
+    ];
+
+    // Check for empty required fields
+    const emptyFields = requiredFields.filter((field) => !field.value);
+
+    if (emptyFields.length > 0) {
+      const fieldNames = emptyFields.map((field) => field.name).join(", ");
+      toast.error(`Please fill in all required fields: ${fieldNames}`);
+      return;
+    }
+
+    // Validate date range
+    if (new Date(startDate) > new Date(endDate)) {
+      toast.error("End date cannot be earlier than start date");
+      return;
+    }
+
     const finalUrls = endpoints.length > 0 ? endpoints.join("\n") : urls;
 
     const newId = createReport({
-      projectName,
-      version,
+      projectName: projectName.trim(),
+      version: version.trim(),
       assessmentType,
       startDate,
       endDate,
-      assessorName: localAssessorName,
+      assessorName: localAssessorName.trim(),
       scope,
       methodology,
       executiveSummary,
       detailedFindings: [],
       conclusion,
       logo: "",
-      platform,
+      platform: platform.trim(),
       urls: finalUrls,
-      credentials,
-      ticketNumber,
-      buildVersions,
+      credentials: credentials.trim(),
+      ticketNumber: ticketNumber.trim(),
+      buildVersions: buildVersions.trim(),
       projectStatus,
-      requestedBy,
+      requestedBy: requestedBy.trim(),
     });
+
+    toast.success("Report created successfully!");
     navigate(`/edit/${newId}`);
   };
 
@@ -143,38 +173,42 @@ function NewReport() {
       <Box display="flex" gap={2} mb={2}>
         <TextField
           type="date"
-          label="Start Date"
+          label="Start Date *"
           InputLabelProps={{ shrink: true }}
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
           style={{ flex: 1 }}
+          required
         />
         <TextField
           type="date"
-          label="End Date"
+          label="End Date *"
           InputLabelProps={{ shrink: true }}
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
           style={{ flex: 1 }}
+          required
         />
       </Box>
 
       <FormControl fullWidth margin="normal">
         <TextField
-          label="Project Name"
+          label="Project Name *"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
           placeholder="Enter project name..."
+          required
         />
       </FormControl>
 
       <Box display="flex" gap={2}>
         <TextField
-          label="Version"
+          label="Version *"
           margin="normal"
           value={version}
           onChange={(e) => setVersion(e.target.value)}
           style={{ flex: 1 }}
+          required
         />
         <TextField
           select
@@ -204,20 +238,22 @@ function NewReport() {
       </Box>
 
       <TextField
-        label="Assessor Name"
+        label="Assessor Name *"
         fullWidth
         margin="normal"
         value={localAssessorName}
         onChange={(e) => setLocalAssessorName(e.target.value)}
+        required
       />
 
       <TextField
-        label="Platform"
+        label="Platform *"
         fullWidth
         margin="normal"
         value={platform}
         onChange={(e) => setPlatform(e.target.value)}
         placeholder="e.g., Web Application, Mobile App, API, etc."
+        required
       />
 
       {/* Project Reference Fields */}
@@ -242,11 +278,12 @@ function NewReport() {
           />
         </Box>
         <TextField
-          label="Requested By"
+          label="Requested By *"
           fullWidth
           value={requestedBy}
           onChange={(e) => setRequestedBy(e.target.value)}
           placeholder="Department or division requesting the assessment"
+          required
         />
       </Box>
 

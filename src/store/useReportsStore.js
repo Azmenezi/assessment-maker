@@ -19,9 +19,18 @@ const useReportsStore = create((set, get) => ({
   createReassessment: (originalReportId, reportData) => {
     const { nanoid } = require("nanoid");
     const originalReport = get().reports.find((r) => r.id === originalReportId);
+
+    // Calculate next version number
+    let nextVersion = "1.0";
+    if (originalReport) {
+      const currentVersion = parseFloat(originalReport.version) || 1.0;
+      nextVersion = (currentVersion + 1.0).toFixed(1);
+    }
+
     const newReport = {
       id: nanoid(),
       ...reportData,
+      version: nextVersion, // Use calculated version instead of hardcoded
       assessmentType: "Reassessment",
       parentAssessmentId: originalReportId,
       parentAssessmentData: originalReport

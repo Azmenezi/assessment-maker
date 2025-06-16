@@ -454,7 +454,6 @@ function EditReport() {
 
         const newReassessmentId = createReassessment(id, {
           projectName: projectName,
-          version: "1.0",
           startDate: new Date().toISOString().split("T")[0],
           endDate: "",
           assessorName,
@@ -1210,16 +1209,14 @@ https://api.example.com/v1`}
               Export ZIP
             </Button>
 
-            {assessmentType === "Initial" && (
-              <Button
-                variant="outlined"
-                color="info"
-                onClick={handleCreateReassessment}
-                style={{ marginLeft: "10px" }}
-              >
-                Create Reassessment
-              </Button>
-            )}
+            <Button
+              variant="outlined"
+              color="info"
+              onClick={handleCreateReassessment}
+              style={{ marginLeft: "10px" }}
+            >
+              Create Reassessment
+            </Button>
 
             <Button
               variant="outlined"
