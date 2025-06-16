@@ -13,12 +13,30 @@ const useFindingsLibraryStore = create((set, get) => ({
     localStorage.setItem(localStorageKey, JSON.stringify(updated));
   },
 
-  // Optionally remove or edit from library
+  updateFindingInLibrary: (index, updatedFinding) => {
+    const updated = [...get().findings];
+    updated[index] = updatedFinding;
+    set({ findings: updated });
+    localStorage.setItem(localStorageKey, JSON.stringify(updated));
+  },
+
   removeFindingFromLibrary: (index) => {
     const updated = [...get().findings];
     updated.splice(index, 1);
     set({ findings: updated });
     localStorage.setItem(localStorageKey, JSON.stringify(updated));
+  },
+
+  // Bulk operations
+  importFindings: (findings) => {
+    const updated = [...get().findings, ...findings];
+    set({ findings: updated });
+    localStorage.setItem(localStorageKey, JSON.stringify(updated));
+  },
+
+  clearLibrary: () => {
+    set({ findings: [] });
+    localStorage.setItem(localStorageKey, JSON.stringify([]));
   },
 }));
 

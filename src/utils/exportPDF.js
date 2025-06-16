@@ -27,6 +27,9 @@ export function exportReportToPDF(
     urls,
     credentials,
     detailedFindings,
+    ticketNumber,
+    buildVersions,
+    requestedBy,
   } = report;
   // Ensure detailedFindings is an array
   const findings = Array.isArray(detailedFindings) ? detailedFindings : [];
@@ -47,12 +50,19 @@ export function exportReportToPDF(
 
   // Calculate severity counts after sorting (order doesn't affect counts, but we do it here anyway)
   const counts = {
-    critical: findings.filter((f) => f.severity === "Critical").length,
-    high: findings.filter((f) => f.severity === "High").length,
-    medium: findings.filter((f) => f.severity === "Medium").length,
-    low: findings.filter((f) => f.severity === "Low").length,
-    informational: findings.filter((f) => f.severity === "Informational")
+    critical: findings.filter(
+      (f) => f.severity === "Critical" && f.status === "OPEN"
+    ).length,
+    high: findings.filter((f) => f.severity === "High" && f.status === "OPEN")
       .length,
+    medium: findings.filter(
+      (f) => f.severity === "Medium" && f.status === "OPEN"
+    ).length,
+    low: findings.filter((f) => f.severity === "Low" && f.status === "OPEN")
+      .length,
+    informational: findings.filter(
+      (f) => f.severity === "Informational" && f.status === "OPEN"
+    ).length,
   };
 
   // Determine overall risk rating:
@@ -242,12 +252,18 @@ export function exportReportToPDF(
           {
             text:
               projectName +
-              (assessmentType === "Reassessment" ? " (Reassessment)" : ""),
+              (assessmentType === "Reassessment" ? " - Reassessment" : ""),
           },
         ],
         [{ text: "Version", bold: true }, { text: version }],
-        [{ text: "Date", bold: true }, { text: startDate }],
+        [{ text: "Date", bold: true }, { text: endDate || startDate }],
         [{ text: "Assessor", bold: true }, { text: assessorName }],
+        ...(ticketNumber
+          ? [[{ text: "Ticket Number", bold: true }, { text: ticketNumber }]]
+          : []),
+        ...(buildVersions
+          ? [[{ text: "Build Versions", bold: true }, { text: buildVersions }]]
+          : []),
       ],
     },
     margin: [0, 20, 0, 20],
@@ -263,7 +279,7 @@ export function exportReportToPDF(
   });
   content.push({ text: "1.1 Assessment Overview", style: "subSectionHeader" });
   content.push({
-    text: `The assessment of ${projectName} commenced on ${startDate} and concluded on ${endDate}. This assessment was requested by Digital Factory Division in order to identify any final concerns prior to the standard being finalized and published.
+    text: `The assessment of ${projectName} commenced on ${startDate} and concluded on ${endDate}. This assessment was requested by ${requestedBy} in order to identify any final concerns prior to the standard being finalized and published.
     
 The assessment engaged the services of Warba in order to:
 • Evaluate whether the security controls introduced in ${projectName} were effective when implemented.
@@ -308,7 +324,10 @@ The results provided are the output of the security assessment performed and sho
     style: "sectionHeader",
     margin: [0, 20, 0, 0],
   });
-  content.push({ text: methodology, style: "normal" });
+  content.push({
+    text: methodology.replace(/{PROJECT_NAME}/g, projectName),
+    style: "normal",
+  });
 
   content.push({ text: "", pageBreak: "after" });
   // Detailed Findings Section
@@ -389,6 +408,15 @@ The results provided are the output of the security assessment performed and sho
           style: "normal",
           margin: [0, 5, 0, 10],
         });
+    }
+
+    // Affected Endpoints
+    if (finding.affectedEndpoints && finding.affectedEndpoints.length > 0) {
+      content.push({
+        text: `Affected Endpoints: ${finding.affectedEndpoints.join(", ")}`,
+        style: "normal",
+        margin: [0, 5, 0, 10],
+      });
     }
 
     // PoC Images

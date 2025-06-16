@@ -1,5 +1,5 @@
 // electron.js
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -46,22 +46,35 @@ if (!fs.existsSync(rootDir)) {
 
 const { Packer } = require("docx");
 
+// Add folder selection dialog
+ipcMain.handle("select-folder", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory"],
+    title: "Select folder for export",
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return { success: true, folderPath: result.filePaths[0] };
+  }
+
+  return { success: false };
+});
+
 ipcMain.handle(
   "export-word-document",
-  async (event, { docData, projectName }) => {
+  async (event, { docData, projectName, exportPath }) => {
     try {
       const buffer = await Packer.toBuffer(docData);
 
-      // Ensure the assessmentReports folder exists
-      const rootDir = path.join(
-        require("os").homedir(),
-        "Desktop",
-        "assessmentReports"
-      );
-      if (!fs.existsSync(rootDir)) fs.mkdirSync(rootDir);
+      // Use provided export path or default
+      const baseDir =
+        exportPath ||
+        path.join(require("os").homedir(), "Desktop", "assessmentReports");
+
+      if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
 
       const projectFolder = path.join(
-        rootDir,
+        baseDir,
         projectName.replace(/\s+/g, "_")
       );
       if (!fs.existsSync(projectFolder)) fs.mkdirSync(projectFolder);
@@ -83,11 +96,18 @@ ipcMain.handle(
 
 ipcMain.handle(
   "export-project-folder",
-  async (event, { projectName, pdfBuffer, wordBuffer, findings }) => {
+  async (
+    event,
+    { projectName, pdfBuffer, wordBuffer, findings, exportPath }
+  ) => {
     const folderName = projectName.replace(/\s+/g, "_");
-    const projectFolder = path.join(rootDir, folderName);
+
+    // Use provided export path or default
+    const baseDir = exportPath || rootDir;
+    const projectFolder = path.join(baseDir, folderName);
+
     if (!fs.existsSync(projectFolder)) {
-      fs.mkdirSync(projectFolder);
+      fs.mkdirSync(projectFolder, { recursive: true });
     }
 
     // Write PDF
@@ -114,7 +134,7 @@ ipcMain.handle(
           const base64Data = img.data.split(",")[1];
           const binary = Buffer.from(base64Data, "base64");
           fs.writeFileSync(
-            path.join(imagesFolder, `finding_${idx + 1}_${f.title}`),
+            path.join(imagesFolder, `finding_${idx + 1}_${f.title}.png`),
             binary
           );
         });

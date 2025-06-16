@@ -16,26 +16,39 @@ const useReportsStore = create((set, get) => ({
     return newReport.id;
   },
 
+  createReassessment: (originalReportId, reportData) => {
+    const { nanoid } = require("nanoid");
+    const originalReport = get().reports.find((r) => r.id === originalReportId);
+    const newReport = {
+      id: nanoid(),
+      ...reportData,
+      assessmentType: "Reassessment",
+      parentAssessmentId: originalReportId,
+      parentAssessmentData: originalReport
+        ? {
+            projectName: originalReport.projectName,
+            version: originalReport.version,
+            startDate: originalReport.startDate,
+            endDate: originalReport.endDate,
+            detailedFindings: originalReport.detailedFindings || [],
+          }
+        : null,
+    };
+    set((state) => {
+      const updated = [...state.reports, newReport];
+      localStorage.setItem(localStorageKey, JSON.stringify(updated));
+      return { reports: updated };
+    });
+    return newReport.id;
+  },
+
   updateReport: (id, updatedData) => {
     set((state) => {
       const updatedReports = state.reports.map((r) =>
         r.id === id ? { ...r, ...updatedData } : r
       );
-      const noPoCReports = updatedReports.map((report) => {
-        const newFindings = report.detailedFindings.map((finding) => {
-          return {
-            ...finding,
-            pocImages: finding.pocImages.map((img) => {
-              return { name: img.name };
-            }),
-          };
-        });
-        return {
-          ...report,
-          detailedFindings: newFindings,
-        };
-      });
-      localStorage.setItem(localStorageKey, JSON.stringify(noPoCReports));
+      // Store with images intact for persistence
+      localStorage.setItem(localStorageKey, JSON.stringify(updatedReports));
       return { reports: updatedReports };
     });
   },
@@ -48,6 +61,10 @@ const useReportsStore = create((set, get) => ({
       localStorage.setItem(localStorageKey, JSON.stringify(filtered));
       return { reports: filtered };
     });
+  },
+
+  getAssessmentsByProject: (projectName) => {
+    return get().reports.filter((r) => r.projectName === projectName);
   },
 }));
 
