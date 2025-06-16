@@ -28,10 +28,13 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import useFindingsLibraryStore from "../store/useFindingsLibraryStore";
+import { ToastContext } from "../App";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 function FindingsLibraryPage() {
+  const toast = useContext(ToastContext);
   const {
     findings,
     addFindingToLibrary,
@@ -58,6 +61,15 @@ function FindingsLibraryPage() {
   const [severityFilter, setSeverityFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
 
+  // Confirmation dialog states
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    severity: "warning",
+  });
+
   const severities = ["Critical", "High", "Medium", "Low", "Informational"];
 
   // Get unique categories from existing findings
@@ -67,7 +79,7 @@ function FindingsLibraryPage() {
 
   const handleAdd = () => {
     if (!title.trim()) {
-      alert("Title is required");
+      toast.error("Title is required");
       return;
     }
 
@@ -89,6 +101,8 @@ function FindingsLibraryPage() {
     setDescription("");
     setImpact("");
     setMitigation("");
+
+    toast.success("Finding added to library successfully!");
   };
 
   const handleEdit = (index) => {
@@ -99,7 +113,7 @@ function FindingsLibraryPage() {
 
   const handleSaveEdit = () => {
     if (!editingFinding.title.trim()) {
-      alert("Title is required");
+      toast.error("Title is required");
       return;
     }
 
@@ -115,6 +129,8 @@ function FindingsLibraryPage() {
     setEditDialogOpen(false);
     setEditingFinding(null);
     setEditingIndex(-1);
+
+    toast.success("Finding updated successfully!");
   };
 
   const handleCancelEdit = () => {
@@ -124,23 +140,31 @@ function FindingsLibraryPage() {
   };
 
   const handleDelete = (index) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this finding from the library?"
-      )
-    ) {
-      removeFindingFromLibrary(index);
-    }
+    setConfirmDialog({
+      open: true,
+      title: "Delete Finding",
+      message:
+        "Are you sure you want to delete this finding from the library? This action cannot be undone.",
+      severity: "error",
+      onConfirm: () => {
+        removeFindingFromLibrary(index);
+        toast.success("Finding deleted from library");
+      },
+    });
   };
 
   const handleClearLibrary = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to clear the entire findings library? This cannot be undone."
-      )
-    ) {
-      clearLibrary();
-    }
+    setConfirmDialog({
+      open: true,
+      title: "Clear Library",
+      message:
+        "Are you sure you want to clear the entire findings library? This will permanently delete all findings and cannot be undone.",
+      severity: "error",
+      onConfirm: () => {
+        clearLibrary();
+        toast.success("Findings library cleared");
+      },
+    });
   };
 
   // Filter findings based on search and filters
@@ -591,6 +615,18 @@ function FindingsLibraryPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        severity={confirmDialog.severity}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </Container>
   );
 }

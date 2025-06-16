@@ -10,28 +10,41 @@ import FindingsLibraryPage from "./pages/FindingsLibraryPage";
 import BackupRestorePage from "./pages/BackupRestorePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import Layout from "./components/Layout/Layout";
+import { useToast } from "./hooks/useToast";
+import { ToastContainer } from "./components/ToastContainer";
 
 const theme = createTheme({
   // Customize MUI theme if needed
 });
 
+// Create a context for toast notifications
+export const ToastContext = React.createContext();
+
 function App() {
+  const toast = useToast();
+
   return (
     <ThemeProvider theme={theme}>
-      <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/new" element={<NewReport />} />
-            <Route path="/edit/:id" element={<EditReport />} />
-            <Route path="/templates" element={<TemplatesPage />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/findings-library" element={<FindingsLibraryPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/backup-restore" element={<BackupRestorePage />} />
-          </Routes>
-        </Layout>
-      </Router>
+      <ToastContext.Provider value={toast}>
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/new" element={<NewReport />} />
+              <Route path="/edit/:id" element={<EditReport />} />
+              <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route
+                path="/findings-library"
+                element={<FindingsLibraryPage />}
+              />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/backup-restore" element={<BackupRestorePage />} />
+            </Routes>
+          </Layout>
+          <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />
+        </Router>
+      </ToastContext.Provider>
     </ThemeProvider>
   );
 }

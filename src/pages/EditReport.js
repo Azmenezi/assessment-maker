@@ -31,13 +31,15 @@ import {
 import { Packer } from "docx";
 import { saveAs } from "file-saver";
 import JSZip from "jszip";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import useFindingsLibraryStore from "../store/useFindingsLibraryStore";
 import useReportsStore from "../store/useReportsStore";
 import useSettingsStore from "../store/useSettingsStore";
 import { exportReportToPDF } from "../utils/exportPDF";
 import { exportReportToWord } from "../utils/exportWord";
+import { ToastContext } from "../App";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -71,6 +73,7 @@ function base64ToBinary(base64) {
 }
 
 function EditReport() {
+  const toast = useContext(ToastContext);
   const { id } = useParams();
   const navigate = useNavigate();
   const { getReportById, updateReport, createReassessment } = useReportsStore();
@@ -176,6 +179,18 @@ function EditReport() {
   const [projectStatus, setProjectStatus] = useState("In Progress");
   const [requestedBy, setRequestedBy] = useState("Digital Factory Division");
 
+  // State for selected finding details dialog
+  const [selectedFinding, setSelectedFinding] = useState(null);
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    severity: "warning",
+  });
+
   useEffect(() => {
     if (report) {
       setProjectName(report.projectName);
@@ -273,7 +288,7 @@ function EditReport() {
       }
     }
 
-    alert("Report saved!");
+    toast.success("Report saved!");
   };
 
   const handleExportPDF = () => {
@@ -423,46 +438,52 @@ function EditReport() {
   };
 
   const handleCreateReassessment = () => {
-    if (window.confirm("Create a new reassessment based on this assessment?")) {
-      const finalUrls =
-        endpoints.length > 0
-          ? [
-              ...endpoints,
-              ...urls.split("\n").filter((line) => line.trim()),
-            ].join("\n")
-          : urls;
+    setConfirmDialog({
+      open: true,
+      title: "Create Reassessment",
+      message: "Create a new reassessment based on this assessment?",
+      severity: "info",
+      onConfirm: () => {
+        const finalUrls =
+          endpoints.length > 0
+            ? [
+                ...endpoints,
+                ...urls.split("\n").filter((line) => line.trim()),
+              ].join("\n")
+            : urls;
 
-      const newReassessmentId = createReassessment(id, {
-        projectName: projectName,
-        version: "1.0",
-        startDate: new Date().toISOString().split("T")[0],
-        endDate: "",
-        assessorName,
-        executiveSummary: "",
-        scope,
-        methodology,
-        detailedFindings: detailedFindings.map((f) => ({
-          ...f,
-          status: "OPEN",
-        })), // Copy findings but reset status
-        conclusion: "",
-        platform,
-        urls: finalUrls,
-        credentials,
-        ticketNumber: ticketNumber,
-        buildVersions,
-        projectStatus: "In Progress", // Reset status for reassessment
-        requestedBy,
-      });
-      navigate(`/edit/${newReassessmentId}`);
-    }
+        const newReassessmentId = createReassessment(id, {
+          projectName: projectName,
+          version: "1.0",
+          startDate: new Date().toISOString().split("T")[0],
+          endDate: "",
+          assessorName,
+          executiveSummary: "",
+          scope,
+          methodology,
+          detailedFindings: detailedFindings.map((f) => ({
+            ...f,
+            status: "OPEN",
+          })), // Copy findings but reset status
+          conclusion: "",
+          platform,
+          urls: finalUrls,
+          credentials,
+          ticketNumber: ticketNumber,
+          buildVersions,
+          projectStatus: "In Progress", // Reset status for reassessment
+          requestedBy,
+        });
+        navigate(`/edit/${newReassessmentId}`);
+      },
+    });
   };
 
-  // State for selected finding details dialog
-  const [selectedFinding, setSelectedFinding] = useState(null);
-
   const handleExportZip = async () => {
-    if (!report) return alert("No report to export.");
+    if (!report) {
+      toast.error("No report to export.");
+      return;
+    }
 
     const finalUrls =
       endpoints.length > 0
@@ -572,7 +593,7 @@ function EditReport() {
         findings: detailedFindings,
         exportPath: exportPath,
       });
-      alert(`Export completed to: ${exportPath}`);
+      toast.success(`Export completed to: ${exportPath}`);
     } else {
       // Default browser download
       saveAs(
@@ -584,9 +605,12 @@ function EditReport() {
 
       // Show export path info if set
       if (exportPath) {
-        alert(
-          `ZIP file downloaded to your browser's default download folder.\nConfigured export path: ${exportPath}\n\nNote: In web version, files are downloaded to browser's default location.`
+        toast.info(
+          `ZIP file downloaded to your browser's default download folder.\nConfigured export path: ${exportPath}\n\nNote: In web version, files are downloaded to browser's default location.`,
+          6000
         );
+      } else {
+        toast.success("ZIP file downloaded successfully!");
       }
     }
   };
@@ -1201,13 +1225,18 @@ https://api.example.com/v1`}
               variant="outlined"
               color="error"
               onClick={() => {
-                if (
-                  window.confirm("Are you sure you want to delete this report?")
-                ) {
-                  useReportsStore.getState().deleteReport(id);
-                  alert("Report deleted!");
-                  navigate("/");
-                }
+                setConfirmDialog({
+                  open: true,
+                  title: "Delete Report",
+                  message:
+                    "Are you sure you want to delete this report? This action cannot be undone.",
+                  severity: "error",
+                  onConfirm: () => {
+                    useReportsStore.getState().deleteReport(id);
+                    toast.success("Report deleted!");
+                    navigate("/");
+                  },
+                });
               }}
               style={{ marginLeft: "10px" }}
             >
@@ -1493,6 +1522,18 @@ https://api.example.com/v1`}
       ) : (
         <Typography variant="h6">Report not found</Typography>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        severity={confirmDialog.severity}
+        confirmText={confirmDialog.severity === "error" ? "Delete" : "Confirm"}
+        cancelText="Cancel"
+      />
     </Container>
   );
 }

@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { Container, Typography, TextField, Button } from "@mui/material";
 import useTemplatesStore from "../store/useTemplatesStore";
+import { ToastContext } from "../App";
 
 function TemplatesPage() {
+  const toast = useContext(ToastContext);
   const {
     executiveSummary,
     scope,
@@ -25,7 +27,7 @@ function TemplatesPage() {
     setScope(localScope);
     setMethodology(localMethodology);
     setAssessorName(localAssessorName);
-    alert("Templates saved!");
+    toast.success("Templates saved successfully!");
   };
 
   return (

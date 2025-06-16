@@ -1,8 +1,10 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useContext } from "react";
 import { Container, Typography, Button, Box, TextField } from "@mui/material";
 import useSettingsStore from "../store/useSettingsStore";
+import { ToastContext } from "../App";
 
 function Settings() {
+  const toast = useContext(ToastContext);
   const fileInputRef = useRef(null);
   const { defaultLogo, exportPath, setDefaultLogo, setExportPath } =
     useSettingsStore();
@@ -18,13 +20,14 @@ function Settings() {
       const base64Logo = evt.target.result;
       setDefaultLogo(base64Logo);
       setPreviewLogo(base64Logo);
+      toast.success("Logo uploaded successfully!");
     };
     reader.readAsDataURL(file);
   };
 
   const handleSaveExportPath = () => {
     setExportPath(localExportPath);
-    alert("Export path saved!");
+    toast.success("Export path saved successfully!");
   };
 
   return (
