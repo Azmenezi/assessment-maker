@@ -105,29 +105,83 @@ The application uses a robust file system storage approach:
 
 ## Development
 
-### Project Structure
+### Prerequisites
 
-```
-src/
-├── components/          # Reusable UI components
-├── hooks/              # Custom React hooks
-├── pages/              # Main application pages
-├── store/              # Zustand state management
-├── utils/              # Utility functions
-└── App.js              # Main application component
+- Node.js (v14 or higher)
+- npm or yarn
 
-electron.js             # Electron main process
-preload.js              # Electron preload script
+### Installation
+
+```bash
+npm install
 ```
 
-### Key Technologies
+### Development Scripts
 
-- **React**: Frontend framework with hooks
-- **Material-UI**: Professional UI component library
-- **Electron**: Desktop application framework
-- **Zustand**: State management
-- **jsPDF & docx**: Document generation
-- **JSZip**: Archive creation
+#### Cross-Platform (Recommended)
+
+```bash
+# Start React development server
+npm start
+
+# Start Electron in development mode (works on Windows, macOS, Linux)
+npm run electron-dev
+
+# Start both React and Electron together
+npm run start-electron
+```
+
+#### Windows-Specific (Alternative)
+
+If you encounter issues with `npm run electron-dev` on Windows, use:
+
+```bash
+npm run electron-dev-win
+```
+
+#### Development Workflow
+
+1. **Option 1 - Separate terminals:**
+
+   ```bash
+   # Terminal 1: Start React dev server
+   npm start
+
+   # Terminal 2: Start Electron (after React is running)
+   npm run electron-dev
+   ```
+
+2. **Option 2 - Single command:**
+   ```bash
+   # Starts both React and Electron automatically
+   npm run start-electron
+   ```
+
+### Production Build
+
+```bash
+# Build React app
+npm run build
+
+# Start Electron with built files
+npm run electron-start
+
+# Build Electron installer
+npm run electron-build
+```
+
+### Troubleshooting
+
+#### Windows Issues
+
+- **NODE_ENV not recognized**: Use `npm run electron-dev` (with cross-env) instead of setting NODE_ENV manually
+- **Path issues**: Make sure Node.js and npm are in your PATH
+- **Permission errors**: Run terminal as administrator if needed
+
+#### macOS/Linux Issues
+
+- **Permission denied**: Run `chmod +x electron.js` if needed
+- **Node version**: Ensure you're using Node.js v14 or higher
 
 ## Contributing
 
