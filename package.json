@@ -29,8 +29,9 @@
     "electron-build": "npm run build && electron-builder",
     "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-dev": "cross-env NODE_ENV=development electron .",
-    "electron-dev-win": "set NODE_ENV=development && electron .",
-    "start-electron": "concurrently \"npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\""
+    "electron-dev-win": "cross-env NODE_ENV=development electron .",
+    "start-electron": "concurrently \"npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
+    "win-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development npx electron .\""
   },
   "build": {
     "appId": "com.assesment.maker",

@@ -174,9 +174,35 @@ npm run electron-build
 
 #### Windows Issues
 
+- **Windows Script Host Error (syntax error)**:
+
+  - **NEVER** double-click `electron.js` directly
+  - **ALWAYS** use the npm scripts: `npm run electron-dev` or `npm run start-electron`
+  - If you get "NODE_ENV not recognized", use: `npm run electron-dev-win`
+  - Alternative: Use the provided `start-electron.bat` file by double-clicking it
+
 - **NODE_ENV not recognized**: Use `npm run electron-dev` (with cross-env) instead of setting NODE_ENV manually
+
 - **Path issues**: Make sure Node.js and npm are in your PATH
-- **Permission errors**: Run terminal as administrator if needed
+
+  - Test with: `node --version` and `npm --version` in Command Prompt
+  - If not found, reinstall Node.js from https://nodejs.org/
+
+- **Permission errors**: Run Command Prompt as administrator if needed
+
+- **Electron not starting**:
+  - Make sure React dev server is running first (`npm start`)
+  - Wait for "Compiled successfully!" message before starting Electron
+  - Use `npm run start-electron` to start both automatically
+
+#### Easy Windows Setup
+
+1. Double-click `start-electron.bat` (recommended for Windows users)
+2. Or use Command Prompt:
+   ```cmd
+   npm install
+   npm run start-electron
+   ```
 
 #### macOS/Linux Issues
 
