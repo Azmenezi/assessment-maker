@@ -357,13 +357,34 @@ function EditReport() {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      return;
+    }
+
+    // Validate file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image size should be less than 10MB");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const base64 = evt.target.result;
-      setNewFinding((prev) => ({
-        ...prev,
-        pocImages: [...prev.pocImages, { name: file.name, data: base64 }],
-      }));
+      try {
+        const base64 = evt.target.result;
+        setNewFinding((prev) => ({
+          ...prev,
+          pocImages: [...prev.pocImages, { name: file.name, data: base64 }],
+        }));
+        toast.success(`Image "${file.name}" added successfully`);
+      } catch (error) {
+        console.error("Error adding image:", error);
+        toast.error("Failed to add image: " + error.message);
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read the image file");
     };
     reader.readAsDataURL(file);
   };
@@ -372,16 +393,37 @@ function EditReport() {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      return;
+    }
+
+    // Validate file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image size should be less than 10MB");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const base64 = evt.target.result;
-      setEditingFinding((prev) => ({
-        ...prev,
-        pocImages: [
-          ...(prev.pocImages || []),
-          { name: file.name, data: base64 },
-        ],
-      }));
+      try {
+        const base64 = evt.target.result;
+        setEditingFinding((prev) => ({
+          ...prev,
+          pocImages: [
+            ...(prev.pocImages || []),
+            { name: file.name, data: base64 },
+          ],
+        }));
+        toast.success(`Image "${file.name}" added successfully`);
+      } catch (error) {
+        console.error("Error adding image:", error);
+        toast.error("Failed to add image: " + error.message);
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read the image file");
     };
     reader.readAsDataURL(file);
   };
@@ -425,16 +467,37 @@ function EditReport() {
   };
 
   const openEditFinding = (finding, index) => {
-    setEditingFinding({ ...finding });
+    // Ensure pocImages is properly initialized
+    const findingWithImages = {
+      ...finding,
+      pocImages: finding.pocImages || [], // Initialize empty array if undefined
+    };
+    setEditingFinding(findingWithImages);
     setEditingFindingIndex(index);
   };
 
   const saveEditedFinding = () => {
-    const updatedFindings = [...detailedFindings];
-    updatedFindings[editingFindingIndex] = { ...editingFinding };
-    setDetailedFindings(updatedFindings);
-    setEditingFinding(null);
-    setEditingFindingIndex(-1);
+    try {
+      if (!editingFinding) {
+        toast.error("No finding to save");
+        return;
+      }
+
+      const updatedFindings = [...detailedFindings];
+      updatedFindings[editingFindingIndex] = { ...editingFinding };
+      setDetailedFindings(updatedFindings);
+
+      // Update the report immediately to persist changes
+      updateReport(id, { detailedFindings: updatedFindings });
+
+      setEditingFinding(null);
+      setEditingFindingIndex(-1);
+
+      toast.success("Finding updated successfully!");
+    } catch (error) {
+      console.error("Error saving finding:", error);
+      toast.error("Failed to save finding: " + error.message);
+    }
   };
 
   const handleCreateReassessment = () => {
@@ -479,138 +542,180 @@ function EditReport() {
   };
 
   const handleExportZip = async () => {
-    if (!report) {
-      toast.error("No report to export.");
-      return;
-    }
-
-    const finalUrls =
-      endpoints.length > 0
-        ? [
-            ...endpoints,
-            ...urls.split("\n").filter((line) => line.trim()),
-          ].join("\n")
-        : urls;
-
-    const pdfDocGenerator = exportReportToPDF(
-      {
-        ...report,
-        projectName,
-        version,
-        assessmentType,
-        startDate,
-        endDate,
-        assessorName,
-        executiveSummary,
-        scope,
-        methodology,
-        detailedFindings,
-        conclusion,
-        logo: report.logo,
-        urls: finalUrls,
-        requestedBy,
-      },
-      { defaultLogo },
-      { returnDoc: true } // get pdfDocGenerator
-    );
-
-    const pdfBlob = await new Promise((resolve) => {
-      pdfDocGenerator.getBlob((blob) => resolve(blob));
-    });
-
-    const doc = await exportReportToWord(
-      {
-        ...report,
-        projectName,
-        version,
-        assessmentType,
-        startDate,
-        endDate,
-        assessorName,
-        executiveSummary,
-        scope,
-        methodology,
-        detailedFindings,
-        conclusion,
-        logo: report.logo,
-        urls: finalUrls,
-        requestedBy,
-      },
-      { defaultLogo },
-      { returnDoc: true } // get Document object
-    );
-    const wordBlob = await Packer.toBlob(doc);
-
-    // Collect images
-    const images = [];
-    detailedFindings.forEach((f, idx) => {
-      if (f.pocImages && f.pocImages.length > 0) {
-        f.pocImages.forEach((img, iidx) => {
-          img.data &&
-            images.push({
-              name: `finding_${idx + 1}_${f.title}.png`,
-              data: img.data,
-            });
-        });
+    try {
+      if (!report) {
+        toast.error("No report to export.");
+        return;
       }
-    });
 
-    const zip = new JSZip();
-    const folderName = projectName.replace(/\s+/g, "_");
-    const folder = zip.folder(folderName);
+      const finalUrls =
+        endpoints.length > 0
+          ? [
+              ...endpoints,
+              ...urls.split("\n").filter((line) => line.trim()),
+            ].join("\n")
+          : urls;
 
-    folder.file(
-      `${folderName}_${
-        assessmentType === "Initial" ? "assessment" : "reassessment"
-      }.pdf`,
-      pdfBlob
-    );
-    folder.file(
-      `${folderName}_${
-        assessmentType === "Initial" ? "assessment" : "reassessment"
-      }.docx`,
-      wordBlob
-    );
-
-    const imagesFolder = folder.folder("findingsImages");
-    images.forEach((img) => {
-      const binaryData = base64ToBinary(img.data);
-      imagesFolder.file(img.name, binaryData);
-    });
-
-    const zipBlob = await zip.generateAsync({ type: "blob" });
-
-    // Save to selected path or default
-    if (exportPath && window.electronAPI) {
-      // Use electron API to save to specific path
-      const pdfBuffer = await pdfBlob.arrayBuffer();
-      const wordBuffer = await wordBlob.arrayBuffer();
-      await window.electronAPI.exportProjectFolder({
-        projectName: folderName,
-        pdfBuffer: new Uint8Array(pdfBuffer),
-        wordBuffer: new Uint8Array(wordBuffer),
-        findings: detailedFindings,
-        exportPath: exportPath,
-      });
-      toast.success(`Export completed to: ${exportPath}`);
-    } else {
-      // Default browser download
-      saveAs(
-        zipBlob,
-        `${folderName}_${
-          assessmentType === "Initial" ? "Assessment" : "Reassessment"
-        }.zip`
+      const pdfDocGenerator = exportReportToPDF(
+        {
+          ...report,
+          projectName,
+          version,
+          assessmentType,
+          startDate,
+          endDate,
+          assessorName,
+          executiveSummary,
+          scope,
+          methodology,
+          detailedFindings,
+          conclusion,
+          logo: report.logo,
+          urls: finalUrls,
+          requestedBy,
+        },
+        { defaultLogo },
+        { returnDoc: true } // get pdfDocGenerator
       );
 
-      // Show export path info if set
-      if (exportPath) {
-        toast.info(
-          `ZIP file downloaded to your browser's default download folder.\nConfigured export path: ${exportPath}\n\nNote: In web version, files are downloaded to browser's default location.`,
-          6000
-        );
+      const pdfBlob = await new Promise((resolve) => {
+        pdfDocGenerator.getBlob((blob) => resolve(blob));
+      });
+
+      const doc = await exportReportToWord(
+        {
+          ...report,
+          projectName,
+          version,
+          assessmentType,
+          startDate,
+          endDate,
+          assessorName,
+          executiveSummary,
+          scope,
+          methodology,
+          detailedFindings,
+          conclusion,
+          logo: report.logo,
+          urls: finalUrls,
+          requestedBy,
+        },
+        { defaultLogo },
+        { returnDoc: true } // get Document object
+      );
+      const wordBlob = await Packer.toBlob(doc);
+
+      // Collect images with better error handling and filename generation
+      const images = [];
+      detailedFindings.forEach((finding, findingIndex) => {
+        if (
+          finding.pocImages &&
+          Array.isArray(finding.pocImages) &&
+          finding.pocImages.length > 0
+        ) {
+          finding.pocImages.forEach((img, imageIndex) => {
+            if (img && img.data) {
+              // Clean up finding title for filename
+              const cleanTitle = finding.title
+                .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
+                .replace(/\s+/g, "_") // Replace spaces with underscores
+                .substring(0, 50); // Limit length
+
+              // Get file extension from data URL or default to png
+              let extension = "png";
+              if (img.data.includes("data:image/jpeg")) extension = "jpg";
+              else if (img.data.includes("data:image/gif")) extension = "gif";
+              else if (img.data.includes("data:image/webp")) extension = "webp";
+
+              const filename = `finding_${findingIndex + 1}_${cleanTitle}_img_${
+                imageIndex + 1
+              }.${extension}`;
+
+              images.push({
+                name: filename,
+                data: img.data,
+                findingTitle: finding.title,
+                findingIndex: findingIndex,
+              });
+            }
+          });
+        }
+      });
+
+      console.log(
+        `Collected ${images.length} images for export:`,
+        images.map((img) => img.name)
+      );
+
+      const zip = new JSZip();
+      const folderName = projectName.replace(/\s+/g, "_");
+      const folder = zip.folder(folderName);
+
+      folder.file(
+        `${folderName}_${
+          assessmentType === "Initial" ? "assessment" : "reassessment"
+        }.pdf`,
+        pdfBlob
+      );
+      folder.file(
+        `${folderName}_${
+          assessmentType === "Initial" ? "assessment" : "reassessment"
+        }.docx`,
+        wordBlob
+      );
+
+      const imagesFolder = folder.folder("findingsImages");
+      images.forEach((img, index) => {
+        try {
+          const binaryData = base64ToBinary(img.data);
+          imagesFolder.file(img.name, binaryData);
+          console.log(`Added image ${index + 1}/${images.length}: ${img.name}`);
+        } catch (error) {
+          console.error(`Failed to add image ${img.name}:`, error);
+          toast.warning(`Failed to export image: ${img.name}`);
+        }
+      });
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+
+      // Save to selected path or default
+      if (exportPath && window.electronAPI) {
+        // Use electron API to save to specific path
+        const pdfBuffer = await pdfBlob.arrayBuffer();
+        const wordBuffer = await wordBlob.arrayBuffer();
+        await window.electronAPI.exportProjectFolder({
+          projectName: folderName,
+          pdfBuffer: new Uint8Array(pdfBuffer),
+          wordBuffer: new Uint8Array(wordBuffer),
+          findings: detailedFindings,
+          exportPath: exportPath,
+        });
+        toast.success(`Export completed to: ${exportPath}`);
       } else {
-        toast.success("ZIP file downloaded successfully!");
+        // Default browser download
+        saveAs(
+          zipBlob,
+          `${folderName}_${
+            assessmentType === "Initial" ? "Assessment" : "Reassessment"
+          }.zip`
+        );
+
+        // Show export path info if set
+        if (exportPath) {
+          toast.info(
+            `ZIP file downloaded to your browser's default download folder.\nConfigured export path: ${exportPath}\n\nNote: In web version, files are downloaded to browser's default location.`,
+            6000
+          );
+        } else {
+          toast.success("ZIP file downloaded successfully!");
+          if (images.length > 0) {
+            toast.info(`Exported ${images.length} finding images`);
+          }
+        }
       }
+    } catch (error) {
+      console.error("Error exporting ZIP:", error);
+      toast.error("Failed to export ZIP: " + error.message);
     }
   };
 
