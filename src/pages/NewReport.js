@@ -34,8 +34,7 @@ function TabPanel(props) {
 function NewReport() {
   const toast = useContext(ToastContext);
   const createReport = useReportsStore((state) => state.createReport);
-  const { executiveSummary, scope, methodology, conclusion, assessorName } =
-    useTemplatesStore();
+  const { assessorName } = useTemplatesStore();
 
   const [projectName, setProjectName] = useState("");
   const [version, setVersion] = useState("1.0");
@@ -109,59 +108,63 @@ function NewReport() {
     }
   };
 
-  const handleCreate = () => {
-    // Validation for required fields
-    const requiredFields = [
-      { value: projectName.trim(), name: "Project Name" },
-      { value: version.trim(), name: "Version" },
-      { value: startDate, name: "Start Date" },
-      { value: endDate, name: "End Date" },
-      { value: localAssessorName.trim(), name: "Assessor Name" },
-      { value: platform.trim(), name: "Platform" },
-      { value: requestedBy.trim(), name: "Requested By" },
-    ];
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    // Check for empty required fields
-    const emptyFields = requiredFields.filter((field) => !field.value);
+    // Validation logic
+    const missingFields = [];
+    if (!projectName.trim()) missingFields.push("Project Name");
+    if (!version.trim()) missingFields.push("Version");
+    if (!startDate) missingFields.push("Start Date");
+    if (!endDate) missingFields.push("End Date");
+    if (!localAssessorName.trim()) missingFields.push("Assessor Name");
+    if (!platform.trim()) missingFields.push("Platform");
+    if (!requestedBy.trim()) missingFields.push("Requested By");
 
-    if (emptyFields.length > 0) {
-      const fieldNames = emptyFields.map((field) => field.name).join(", ");
-      toast.error(`Please fill in all required fields: ${fieldNames}`);
+    if (missingFields.length > 0) {
+      toast.error(
+        `Please fill in the following required fields: ${missingFields.join(
+          ", "
+        )}`
+      );
       return;
     }
 
-    // Validate date range
+    // Date validation
     if (new Date(startDate) > new Date(endDate)) {
-      toast.error("End date cannot be earlier than start date");
+      toast.error("Start Date cannot be after End Date");
       return;
     }
 
-    const finalUrls = endpoints.length > 0 ? endpoints.join("\n") : urls;
+    try {
+      const newReportId = await createReport({
+        projectName,
+        version,
+        assessmentType,
+        startDate,
+        endDate,
+        assessorName: localAssessorName,
+        executiveSummary: "",
+        scope: "",
+        methodology: "",
+        detailedFindings: [],
+        conclusion: "",
+        logo: null,
+        platform,
+        urls: "",
+        credentials: "",
+        ticketNumber,
+        buildVersions,
+        projectStatus,
+        requestedBy,
+      });
 
-    const newId = createReport({
-      projectName: projectName.trim(),
-      version: version.trim(),
-      assessmentType,
-      startDate,
-      endDate,
-      assessorName: localAssessorName.trim(),
-      scope,
-      methodology,
-      executiveSummary,
-      detailedFindings: [],
-      conclusion,
-      logo: "",
-      platform: platform.trim(),
-      urls: finalUrls,
-      credentials: credentials.trim(),
-      ticketNumber: ticketNumber.trim(),
-      buildVersions: buildVersions.trim(),
-      projectStatus,
-      requestedBy: requestedBy.trim(),
-    });
-
-    toast.success("Report created successfully!");
-    navigate(`/edit/${newId}`);
+      toast.success("Report created successfully!");
+      navigate(`/edit/${newReportId}`);
+    } catch (error) {
+      console.error("Error creating report:", error);
+      toast.error("Failed to create report: " + error.message);
+    }
   };
 
   return (
@@ -411,7 +414,7 @@ https://api.example.com/v1`}
         <Button
           variant="contained"
           color="primary"
-          onClick={handleCreate}
+          onClick={handleSubmit}
           size="large"
         >
           Create & Edit Report

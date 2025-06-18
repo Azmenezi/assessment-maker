@@ -1,70 +1,150 @@
-# Getting Started with Create React App
+# Assessment Maker
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A professional penetration testing report generator built with React and Electron, featuring modern UI components and comprehensive report management.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+### Core Functionality
 
-### `npm start`
+- **Modern Report Creation**: Create detailed penetration testing reports with structured findings
+- **Reassessment Support**: Generate follow-up assessments with version tracking
+- **Finding Management**: Comprehensive finding library with categorization and severity levels
+- **Professional Export**: Export reports to PDF, Word, and ZIP formats with embedded images
+- **File System Storage**: Robust file-based storage system for unlimited report and image capacity
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Enhanced User Experience
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **Toast Notifications**: Non-intrusive notifications for all user actions
+- **Modern Confirmation Dialogs**: Professional confirmation dialogs with contextual icons
+- **Real-time Validation**: Comprehensive form validation with helpful error messages
+- **Advanced Filtering**: Multi-criteria filtering and sorting for report management
+- **Responsive Design**: Modern Material-UI components with professional styling
 
-### `npm test`
+### Technical Architecture
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Electron Desktop App**: Native desktop application with file system access
+- **File-Based Storage**: Reports stored as JSON files, images stored as separate files
+- **Image Management**: Automatic image compression and file system storage
+- **Storage Locations**:
+  - Reports: `~/Documents/AssessmentMaker/reports/`
+  - Images: `~/Documents/AssessmentMaker/images/`
+  - Exports: `~/Desktop/assessmentReports/`
 
-### `npm run build`
+## Installation
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Prerequisites
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js (v14 or higher)
+- npm or yarn
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Setup
 
-### `npm run eject`
+```bash
+# Clone the repository
+git clone <repository-url>
+cd assessment-maker
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+# Install dependencies
+npm install
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# Start development server
+npm start
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Build for production
+npm run build
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+# Package as Electron app
+npm run electron-pack
+```
 
-## Learn More
+## Storage System
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### File System Architecture
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+The application uses a robust file system storage approach:
 
-### Code Splitting
+1. **Reports Storage**: JSON files in `~/Documents/AssessmentMaker/reports/`
+2. **Image Storage**: Binary files in `~/Documents/AssessmentMaker/images/`
+3. **Export Location**: `~/Desktop/assessmentReports/`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Benefits Over localStorage
 
-### Analyzing the Bundle Size
+- **Unlimited Storage**: No 5MB localStorage limitations
+- **Better Performance**: Large images don't slow down the application
+- **Data Persistence**: Files survive browser cache clearing
+- **Professional Architecture**: Proper separation of data and application code
+- **Easy Backup**: Simple file-based backup and restore
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Image Management
 
-### Making a Progressive Web App
+- **Automatic Compression**: Images are optimized for storage efficiency
+- **Multiple Formats**: Support for PNG, JPG, GIF, WebP
+- **File Size Limits**: Up to 50MB per image (vs 10MB in localStorage version)
+- **Unique Identifiers**: UUID-based image identification system
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Usage
 
-### Advanced Configuration
+### Creating Reports
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+1. Click "New Report" and fill in required fields
+2. Add findings with descriptions, impacts, and mitigation steps
+3. Upload proof-of-concept images for each finding
+4. Save and export in multiple formats
 
-### Deployment
+### Managing Images
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+- Images are automatically compressed and stored in the file system
+- Each image gets a unique identifier for reliable referencing
+- Images are included in ZIP exports for complete documentation
 
-### `npm run build` fails to minify
+### Reassessments
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Create follow-up assessments from existing reports
+- Automatic version incrementing (v1.0 → v2.0 → v3.0)
+- Track changes between assessment versions
+
+## Development
+
+### Project Structure
+
+```
+src/
+├── components/          # Reusable UI components
+├── hooks/              # Custom React hooks
+├── pages/              # Main application pages
+├── store/              # Zustand state management
+├── utils/              # Utility functions
+└── App.js              # Main application component
+
+electron.js             # Electron main process
+preload.js              # Electron preload script
+```
+
+### Key Technologies
+
+- **React**: Frontend framework with hooks
+- **Material-UI**: Professional UI component library
+- **Electron**: Desktop application framework
+- **Zustand**: State management
+- **jsPDF & docx**: Document generation
+- **JSZip**: Archive creation
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+[Add your license information here]
+
+## Support
+
+For issues and questions, please create an issue in the repository.
+
+---
+
+**Note**: This application is designed for professional penetration testing workflows and includes features for comprehensive security assessment documentation.

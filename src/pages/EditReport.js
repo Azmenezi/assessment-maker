@@ -104,71 +104,72 @@ function compressImage(file, maxWidth = 1200, maxHeight = 800, quality = 0.8) {
   });
 }
 
-// Storage monitoring utilities
-function getStorageUsage() {
-  let total = 0;
-  for (let key in localStorage) {
-    if (localStorage.hasOwnProperty(key)) {
-      total += localStorage[key].length + key.length;
-    }
-  }
-  return total;
-}
-
-function formatBytes(bytes) {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
-function checkStorageQuota() {
-  const usage = getStorageUsage();
-  const limit = 5 * 1024 * 1024; // 5MB typical localStorage limit
-  const usagePercent = (usage / limit) * 100;
-
-  return {
-    usage,
-    limit,
-    usagePercent,
-    available: limit - usage,
-    isNearLimit: usagePercent > 80,
-    isAtLimit: usagePercent > 95,
-  };
-}
-
-// Add storage usage component
-function StorageUsageIndicator() {
-  const [storageInfo, setStorageInfo] = React.useState(null);
+// Component to display images from file system or base64
+function ImageDisplay({ image, style, alt }) {
+  const [imageSrc, setImageSrc] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
 
   React.useEffect(() => {
-    const updateStorageInfo = () => {
-      setStorageInfo(checkStorageQuota());
+    const loadImage = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        if (image.isFileStored && window.electronAPI) {
+          // Load from file system
+          const result = await window.electronAPI.getImage(image.imageId);
+          if (result.success) {
+            setImageSrc(result.data);
+          } else {
+            throw new Error(result.error);
+          }
+        } else if (image.data) {
+          // Use base64 data directly
+          setImageSrc(image.data);
+        } else {
+          throw new Error("No image data available");
+        }
+      } catch (err) {
+        console.error("Error loading image:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    updateStorageInfo();
-    const interval = setInterval(updateStorageInfo, 5000); // Update every 5 seconds
+    loadImage();
+  }, [image]);
 
-    return () => clearInterval(interval);
-  }, []);
+  if (loading) {
+    return (
+      <Box
+        style={style}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Typography variant="caption">Loading...</Typography>
+      </Box>
+    );
+  }
 
-  if (!storageInfo) return null;
+  if (error) {
+    return (
+      <Box
+        style={style}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Typography variant="caption" color="error">
+          Failed to load image: {error}
+        </Typography>
+      </Box>
+    );
+  }
 
-  const getColor = () => {
-    if (storageInfo.isAtLimit) return "error";
-    if (storageInfo.isNearLimit) return "warning";
-    return "info";
-  };
-
-  return (
-    <Box sx={{ mb: 2 }}>
-      <Typography variant="caption" color={getColor()}>
-        Storage: {storageInfo.usagePercent.toFixed(1)}% used (
-        {formatBytes(storageInfo.usage)} / {formatBytes(storageInfo.limit)})
-      </Typography>
-    </Box>
-  );
+  return <img src={imageSrc} alt={alt || image.name} style={style} />;
 }
 
 function EditReport() {
@@ -343,19 +344,8 @@ function EditReport() {
     updateReport(id, { detailedFindings: updatedFindings });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      // Check storage before saving
-      const storageInfo = checkStorageQuota();
-      if (storageInfo.isAtLimit) {
-        toast.error(
-          `Cannot save: Storage quota exceeded (${formatBytes(
-            storageInfo.usage
-          )}/${formatBytes(storageInfo.limit)}). Please delete some data.`
-        );
-        return;
-      }
-
       const finalUrls =
         endpoints.length > 0
           ? [
@@ -364,7 +354,7 @@ function EditReport() {
             ].join("\n")
           : urls;
 
-      updateReport(id, {
+      await updateReport(id, {
         projectName,
         version,
         assessmentType,
@@ -401,28 +391,9 @@ function EditReport() {
       }
 
       toast.success("Report saved!");
-
-      // Show storage info if getting close to limit
-      const newStorageInfo = checkStorageQuota();
-      if (newStorageInfo.isNearLimit) {
-        toast.info(
-          `Storage: ${newStorageInfo.usagePercent.toFixed(
-            1
-          )}% full (${formatBytes(newStorageInfo.usage)})`
-        );
-      }
     } catch (error) {
       console.error("Error saving report:", error);
-      if (
-        error.message.includes("quota") ||
-        error.name === "QuotaExceededError"
-      ) {
-        toast.error(
-          "Storage quota exceeded. Please delete some images or reports to free up space."
-        );
-      } else {
-        toast.error("Failed to save report: " + error.message);
-      }
+      toast.error("Failed to save report: " + error.message);
     }
   };
 
@@ -492,78 +463,87 @@ function EditReport() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check storage quota first
-    const storageInfo = checkStorageQuota();
-    if (storageInfo.isAtLimit) {
-      toast.error(
-        `Storage quota exceeded (${formatBytes(
-          storageInfo.usage
-        )}/${formatBytes(
-          storageInfo.limit
-        )}). Please delete some images or reports.`
-      );
-      return;
-    }
-
-    if (storageInfo.isNearLimit) {
-      toast.warning(
-        `Storage is ${storageInfo.usagePercent.toFixed(
-          1
-        )}% full. Consider cleaning up old data.`
-      );
-    }
-
     // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select a valid image file");
       return;
     }
 
-    // Validate file size (limit to 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image size should be less than 10MB");
+    // Validate file size (limit to 50MB for file system storage)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Image size should be less than 50MB");
       return;
     }
 
     try {
-      toast.info("Compressing image...");
+      toast.info("Saving image...");
 
-      // Compress the image
-      const compressedDataUrl = await compressImage(file);
+      if (window.electronAPI) {
+        // Use Electron file system storage
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const base64Data = evt.target.result;
+            const result = await window.electronAPI.saveImage(
+              base64Data,
+              file.name
+            );
 
-      // Calculate compression ratio
-      const originalSize = file.size;
-      const compressedSize = Math.round((compressedDataUrl.length * 3) / 4); // Approximate base64 to bytes
-      const compressionRatio = (
-        ((originalSize - compressedSize) / originalSize) *
-        100
-      ).toFixed(1);
+            if (result.success) {
+              setNewFinding((prev) => ({
+                ...prev,
+                pocImages: [
+                  ...prev.pocImages,
+                  {
+                    imageId: result.imageId,
+                    name: result.originalFilename,
+                    savedFilename: result.savedFilename,
+                    isFileStored: true,
+                  },
+                ],
+              }));
 
-      setNewFinding((prev) => ({
-        ...prev,
-        pocImages: [
-          ...prev.pocImages,
-          {
-            name: file.name,
-            data: compressedDataUrl,
-            originalSize: originalSize,
-            compressedSize: compressedSize,
-          },
-        ],
-      }));
+              toast.success(`Image "${file.name}" saved successfully`);
+            } else {
+              throw new Error(result.error);
+            }
+          } catch (error) {
+            console.error("Error saving image:", error);
+            toast.error("Failed to save image: " + error.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Fallback to compression for web version
+        const compressedDataUrl = await compressImage(file);
+        const originalSize = file.size;
+        const compressedSize = Math.round((compressedDataUrl.length * 3) / 4);
+        const compressionRatio = (
+          ((originalSize - compressedSize) / originalSize) *
+          100
+        ).toFixed(1);
 
-      toast.success(
-        `Image "${file.name}" added successfully (${compressionRatio}% smaller)`
-      );
+        setNewFinding((prev) => ({
+          ...prev,
+          pocImages: [
+            ...prev.pocImages,
+            {
+              name: file.name,
+              data: compressedDataUrl,
+              originalSize: originalSize,
+              compressedSize: compressedSize,
+              isFileStored: false,
+            },
+          ],
+        }));
+
+        toast.success(
+          `Image "${file.name}" added successfully (${compressionRatio}% smaller)`
+        );
+      }
     } catch (error) {
       console.error("Error adding image:", error);
-      if (error.message.includes("quota")) {
-        toast.error(
-          "Storage quota exceeded. Please delete some images or reports."
-        );
-      } else {
-        toast.error("Failed to add image: " + error.message);
-      }
+      toast.error("Failed to add image: " + error.message);
     }
   };
 
@@ -571,78 +551,87 @@ function EditReport() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Check storage quota first
-    const storageInfo = checkStorageQuota();
-    if (storageInfo.isAtLimit) {
-      toast.error(
-        `Storage quota exceeded (${formatBytes(
-          storageInfo.usage
-        )}/${formatBytes(
-          storageInfo.limit
-        )}). Please delete some images or reports.`
-      );
-      return;
-    }
-
-    if (storageInfo.isNearLimit) {
-      toast.warning(
-        `Storage is ${storageInfo.usagePercent.toFixed(
-          1
-        )}% full. Consider cleaning up old data.`
-      );
-    }
-
     // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select a valid image file");
       return;
     }
 
-    // Validate file size (limit to 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image size should be less than 10MB");
+    // Validate file size (limit to 50MB for file system storage)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Image size should be less than 50MB");
       return;
     }
 
     try {
-      toast.info("Compressing image...");
+      toast.info("Saving image...");
 
-      // Compress the image
-      const compressedDataUrl = await compressImage(file);
+      if (window.electronAPI) {
+        // Use Electron file system storage
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const base64Data = evt.target.result;
+            const result = await window.electronAPI.saveImage(
+              base64Data,
+              file.name
+            );
 
-      // Calculate compression ratio
-      const originalSize = file.size;
-      const compressedSize = Math.round((compressedDataUrl.length * 3) / 4); // Approximate base64 to bytes
-      const compressionRatio = (
-        ((originalSize - compressedSize) / originalSize) *
-        100
-      ).toFixed(1);
+            if (result.success) {
+              setEditingFinding((prev) => ({
+                ...prev,
+                pocImages: [
+                  ...(prev.pocImages || []),
+                  {
+                    imageId: result.imageId,
+                    name: result.originalFilename,
+                    savedFilename: result.savedFilename,
+                    isFileStored: true,
+                  },
+                ],
+              }));
 
-      setEditingFinding((prev) => ({
-        ...prev,
-        pocImages: [
-          ...(prev.pocImages || []),
-          {
-            name: file.name,
-            data: compressedDataUrl,
-            originalSize: originalSize,
-            compressedSize: compressedSize,
-          },
-        ],
-      }));
+              toast.success(`Image "${file.name}" saved successfully`);
+            } else {
+              throw new Error(result.error);
+            }
+          } catch (error) {
+            console.error("Error saving image:", error);
+            toast.error("Failed to save image: " + error.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Fallback to compression for web version
+        const compressedDataUrl = await compressImage(file);
+        const originalSize = file.size;
+        const compressedSize = Math.round((compressedDataUrl.length * 3) / 4);
+        const compressionRatio = (
+          ((originalSize - compressedSize) / originalSize) *
+          100
+        ).toFixed(1);
 
-      toast.success(
-        `Image "${file.name}" added successfully (${compressionRatio}% smaller)`
-      );
+        setEditingFinding((prev) => ({
+          ...prev,
+          pocImages: [
+            ...(prev.pocImages || []),
+            {
+              name: file.name,
+              data: compressedDataUrl,
+              originalSize: originalSize,
+              compressedSize: compressedSize,
+              isFileStored: false,
+            },
+          ],
+        }));
+
+        toast.success(
+          `Image "${file.name}" added successfully (${compressionRatio}% smaller)`
+        );
+      }
     } catch (error) {
       console.error("Error adding image:", error);
-      if (error.message.includes("quota")) {
-        toast.error(
-          "Storage quota exceeded. Please delete some images or reports."
-        );
-      } else {
-        toast.error("Failed to add image: " + error.message);
-      }
+      toast.error("Failed to add image: " + error.message);
     }
   };
 
@@ -825,40 +814,81 @@ function EditReport() {
 
       // Collect images with better error handling and filename generation
       const images = [];
-      detailedFindings.forEach((finding, findingIndex) => {
+
+      for (const [findingIndex, finding] of detailedFindings.entries()) {
         if (
           finding.pocImages &&
           Array.isArray(finding.pocImages) &&
           finding.pocImages.length > 0
         ) {
-          finding.pocImages.forEach((img, imageIndex) => {
-            if (img && img.data) {
+          for (const [imageIndex, img] of finding.pocImages.entries()) {
+            if (img) {
               // Clean up finding title for filename
               const cleanTitle = finding.title
                 .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
                 .replace(/\s+/g, "_") // Replace spaces with underscores
                 .substring(0, 50); // Limit length
 
-              // Get file extension from data URL or default to png
+              let imageData = null;
               let extension = "png";
-              if (img.data.includes("data:image/jpeg")) extension = "jpg";
-              else if (img.data.includes("data:image/gif")) extension = "gif";
-              else if (img.data.includes("data:image/webp")) extension = "webp";
 
-              const filename = `finding_${findingIndex + 1}_${cleanTitle}_img_${
-                imageIndex + 1
-              }.${extension}`;
+              try {
+                if (img.isFileStored && window.electronAPI) {
+                  // Load from file system
+                  const result = await window.electronAPI.getImage(img.imageId);
+                  if (result.success) {
+                    imageData = result.data;
+                  } else {
+                    console.warn(
+                      `Failed to load image ${img.imageId}:`,
+                      result.error
+                    );
+                    continue;
+                  }
+                } else if (img.data) {
+                  // Use base64 data directly
+                  imageData = img.data;
+                } else {
+                  console.warn("No image data available for:", img.name);
+                  continue;
+                }
 
-              images.push({
-                name: filename,
-                data: img.data,
-                findingTitle: finding.title,
-                findingIndex: findingIndex,
-              });
+                // Get file extension from data URL or filename
+                if (imageData.includes("data:image/jpeg")) extension = "jpg";
+                else if (imageData.includes("data:image/gif"))
+                  extension = "gif";
+                else if (imageData.includes("data:image/webp"))
+                  extension = "webp";
+                else if (img.name) {
+                  const fileExt = img.name.split(".").pop()?.toLowerCase();
+                  if (["jpg", "jpeg", "png", "gif", "webp"].includes(fileExt)) {
+                    extension = fileExt === "jpeg" ? "jpg" : fileExt;
+                  }
+                }
+
+                const filename = `finding_${
+                  findingIndex + 1
+                }_${cleanTitle}_img_${imageIndex + 1}.${extension}`;
+
+                images.push({
+                  name: filename,
+                  data: imageData,
+                  findingTitle: finding.title,
+                  findingIndex: findingIndex,
+                });
+              } catch (error) {
+                console.error(
+                  `Error processing image for finding ${findingIndex + 1}:`,
+                  error
+                );
+                toast.warning(
+                  `Failed to process image: ${img.name || "Unknown"}`
+                );
+              }
             }
-          });
+          }
         }
-      });
+      }
 
       console.log(
         `Collected ${images.length} images for export:`,
@@ -944,8 +974,6 @@ function EditReport() {
           <Typography variant="h4" gutterBottom>
             Editing Report: {projectName} (v{version})
           </Typography>
-
-          <StorageUsageIndicator />
 
           {/* Show parent assessment info for reassessments */}
           {report.assessmentType === "Reassessment" &&
@@ -1429,11 +1457,7 @@ https://api.example.com/v1`}
               {newFinding.pocImages.map((img, idx) => (
                 <Box key={idx} mt={1}>
                   <Typography variant="body2">{img.name}</Typography>
-                  <img
-                    src={img.data}
-                    alt={img.name}
-                    style={{ maxWidth: "200px" }}
-                  />
+                  <ImageDisplay image={img} style={{ maxWidth: "200px" }} />
                 </Box>
               ))}
 
@@ -1637,9 +1661,8 @@ https://api.example.com/v1`}
                       {selectedFinding.pocImages.map((img, idx) => (
                         <Box key={idx} mt={1}>
                           <Typography variant="body2">{img.name}</Typography>
-                          <img
-                            src={img.data}
-                            alt={img.name}
+                          <ImageDisplay
+                            image={img}
                             style={{ maxWidth: "500px" }}
                           />
                         </Box>
@@ -1810,11 +1833,7 @@ https://api.example.com/v1`}
                 {(editingFinding.pocImages || []).map((img, idx) => (
                   <Box key={idx} mt={1}>
                     <Typography variant="body2">{img.name}</Typography>
-                    <img
-                      src={img.data}
-                      alt={img.name}
-                      style={{ maxWidth: "200px" }}
-                    />
+                    <ImageDisplay image={img} style={{ maxWidth: "200px" }} />
                     <Button
                       size="small"
                       color="error"

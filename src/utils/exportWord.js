@@ -205,6 +205,50 @@ export async function exportReportToWord(
   const infoCount = counts.informational;
   const total = criticalCount + highCount + mediumCount + lowCount + infoCount;
 
+  // Pre-process all images to avoid async issues in document building
+  const processedFindings = [];
+  for (const finding of findings) {
+    const processedFinding = { ...finding };
+    const processedImages = [];
+
+    if (finding.pocImages && finding.pocImages.length > 0) {
+      for (const img of finding.pocImages) {
+        if (img && img.data) {
+          try {
+            // Load image data for file-stored images
+            let imageData = img.data;
+            if (img.isFileStored && window.electronAPI) {
+              const result = await window.electronAPI.getImage(img.imageId);
+              if (result.success) {
+                imageData = result.data;
+              } else {
+                console.warn(
+                  `Failed to load image ${img.imageId}:`,
+                  result.error
+                );
+                processedImages.push({ name: img.name, error: true });
+                continue;
+              }
+            }
+
+            const imageBuffer = await base64ToArrayBuffer(imageData);
+            processedImages.push({
+              name: img.name,
+              buffer: imageBuffer,
+              error: false,
+            });
+          } catch (error) {
+            console.error("Error processing PoC image:", error);
+            processedImages.push({ name: img.name, error: true });
+          }
+        }
+      }
+    }
+
+    processedFinding.processedImages = processedImages;
+    processedFindings.push(processedFinding);
+  }
+
   // Project details table - matching PDF exactly
   const projectDetailsTableRows = [
     new TableRow({
@@ -649,12 +693,13 @@ export async function exportReportToWord(
                     text: `${total}\nTotal`,
                     size: 20,
                     color: "000000",
+                    bold: true,
                   }),
                 ],
                 alignment: AlignmentType.CENTER,
               }),
             ],
-            shading: { fill: "C0C0C0", type: ShadingType.SOLID },
+            shading: { fill: "FFFFFF", type: ShadingType.SOLID },
             borders: {
               top: { style: BorderStyle.SINGLE, size: 1 },
               bottom: { style: BorderStyle.SINGLE, size: 1 },
@@ -665,10 +710,10 @@ export async function exportReportToWord(
         ],
       }),
     ],
-    width: { size: 60, type: WidthType.PERCENTAGE },
+    width: { size: 100, type: WidthType.PERCENTAGE },
   });
 
-  // Platform details table
+  // Platform table
   const platformTable = new Table({
     rows: [
       new TableRow({
@@ -711,11 +756,7 @@ export async function exportReportToWord(
             children: [
               new Paragraph({
                 children: [
-                  new TextRun({
-                    text: "IP Address/URL's",
-                    bold: true,
-                    size: 20,
-                  }),
+                  new TextRun({ text: "URLs/Endpoints", bold: true, size: 20 }),
                 ],
               }),
             ],
@@ -872,10 +913,10 @@ The results provided are the output of the security assessment performed and sho
   children.push(new Paragraph({ children: [], spacing: { after: 200 } }));
   children.push(severityMatrixTable);
 
-  // Individual findings details
-  if (findings.length > 0) {
+  // Individual findings details - now using pre-processed images
+  if (processedFindings.length > 0) {
     children.push(pageBreakParagraph());
-    findings.forEach((f, index) => {
+    processedFindings.forEach((f, index) => {
       children.push(findingTitleParagraph(`${index + 1}. ${f.title}`));
       children.push(subSectionHeaderParagraph("Category"));
       children.push(normalParagraph(f.category || ""));
@@ -894,33 +935,31 @@ The results provided are the output of the security assessment performed and sho
         children.push(normalParagraph(f.affectedEndpoints.join(", ")));
       }
 
-      // Add PoC images if they exist
-      if (f.pocImages && f.pocImages.length > 0) {
+      // Add PoC images if they exist - now using pre-processed images
+      if (f.processedImages && f.processedImages.length > 0) {
         children.push(subSectionHeaderParagraph("Proof of Concept"));
-        f.pocImages.forEach(async (img) => {
-          if (img.data) {
-            try {
-              const imageBuffer = await base64ToArrayBuffer(img.data);
-              children.push(
-                new Paragraph({
-                  children: [
-                    new ImageRun({
-                      data: imageBuffer,
-                      transformation: { width: 500, height: 300 },
-                    }),
-                  ],
-                  spacing: { before: 100, after: 100 },
-                })
-              );
-            } catch (error) {
-              console.error("Error adding PoC image:", error);
-              children.push(normalParagraph(`[Image: ${img.name}]`));
-            }
+        f.processedImages.forEach((img) => {
+          if (img.error) {
+            children.push(
+              normalParagraph(`[Image: ${img.name}] - Failed to load`)
+            );
+          } else {
+            children.push(
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: img.buffer,
+                    transformation: { width: 500, height: 300 },
+                  }),
+                ],
+                spacing: { before: 100, after: 100 },
+              })
+            );
           }
         });
       }
 
-      if (index < findings.length - 1) {
+      if (index < processedFindings.length - 1) {
         children.push(new Paragraph({ children: [], spacing: { after: 400 } }));
       }
     });
