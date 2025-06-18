@@ -7,7 +7,41 @@ const { v4: uuidv4 } = require("uuid");
 
 let mainWindow;
 
-function createWindow() {
+// Function to detect React dev server port
+async function detectReactPort() {
+  const http = require("http");
+
+  const checkPort = (port) => {
+    return new Promise((resolve) => {
+      const req = http.get(`http://localhost:${port}`, (res) => {
+        resolve(true);
+      });
+      req.on("error", () => {
+        resolve(false);
+      });
+      req.setTimeout(1000, () => {
+        req.destroy();
+        resolve(false);
+      });
+    });
+  };
+
+  // Check common React dev server ports
+  const portsToCheck = [3000, 3001, 3002, 3003];
+
+  for (const port of portsToCheck) {
+    const isAvailable = await checkPort(port);
+    if (isAvailable) {
+      console.log(`Found React dev server on port ${port}`);
+      return port;
+    }
+  }
+
+  console.log("No React dev server found, defaulting to port 3000");
+  return 3000;
+}
+
+async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -23,8 +57,12 @@ function createWindow() {
   const isDev = process.env.NODE_ENV === "development";
 
   if (isDev) {
-    // For development:
-    mainWindow.loadURL("http://localhost:3000");
+    // For development: detect React port dynamically
+    const reactPort = await detectReactPort();
+    const devUrl = `http://localhost:${reactPort}`;
+    console.log(`Loading React app from: ${devUrl}`);
+
+    mainWindow.loadURL(devUrl);
     mainWindow.webContents.openDevTools();
   } else {
     // For production:
@@ -41,15 +79,26 @@ function createWindow() {
     "did-fail-load",
     (event, errorCode, errorDescription) => {
       console.error("Failed to load:", errorCode, errorDescription);
+
+      // If in development and failed to load, try other ports
+      if (isDev) {
+        console.log("Retrying with different ports...");
+        setTimeout(async () => {
+          const newPort = await detectReactPort();
+          const newUrl = `http://localhost:${newPort}`;
+          console.log(`Retrying with: ${newUrl}`);
+          mainWindow.loadURL(newUrl);
+        }, 2000);
+      }
     }
   );
 }
 
-app.whenReady().then(() => {
-  createWindow();
+app.whenReady().then(async () => {
+  await createWindow();
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  app.on("activate", async () => {
+    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
   });
 });
 

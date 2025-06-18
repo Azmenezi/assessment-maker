@@ -30,8 +30,11 @@
     "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-dev": "cross-env NODE_ENV=development electron .",
     "electron-dev-win": "cross-env NODE_ENV=development electron .",
-    "start-electron": "concurrently \"npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
-    "win-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development npx electron .\""
+    "start-electron": "concurrently \"npm start\" \"wait-on http://localhost:3000 http://localhost:3001 http://localhost:3002 && cross-env NODE_ENV=development electron .\"",
+    "win-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 http://localhost:3001 http://localhost:3002 && cross-env NODE_ENV=development npx electron .\"",
+    "start-electron-3002": "concurrently \"npm start\" \"wait-on http://localhost:3002 && cross-env NODE_ENV=development electron .\"",
+    "debug-electron": "cross-env NODE_ENV=development DEBUG=* electron .",
+    "test-electron": "cross-env NODE_ENV=development electron test-electron.js"
   },
   "build": {
     "appId": "com.assesment.maker",

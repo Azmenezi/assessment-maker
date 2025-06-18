@@ -38,9 +38,14 @@ if not exist "node_modules" (
 
 echo Starting React development server and Electron...
 echo.
-echo This will open two processes:
-echo 1. React development server (http://localhost:3000)
-echo 2. Electron desktop application
+echo IMPORTANT: 
+echo - React will start first (usually on port 3000, 3001, or 3002)
+echo - Wait for "Compiled successfully!" message
+echo - Then Electron will start automatically
+echo.
+echo If Electron doesn't start, try these alternatives:
+echo 1. npm run start-electron-3002
+echo 2. npm run win-dev
 echo.
 echo Press Ctrl+C to stop both processes
 echo.
