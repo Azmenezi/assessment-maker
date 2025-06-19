@@ -361,6 +361,69 @@ const dbHelpers = {
     });
   },
 
+  // Optimized function to get reports list without detailed findings/images (for performance)
+  async getAllReportsLight() {
+    return new Promise((resolve, reject) => {
+      db.all(
+        "SELECT id, project_name, version, assessment_type, start_date, end_date, assessor_name, platform, project_status, requested_by, fix_by_date, parent_assessment_id, created_at, updated_at FROM reports ORDER BY updated_at DESC",
+        [],
+        (err, rows) => {
+          if (err) reject(err);
+          else {
+            const decryptedRows = rows.map((row) => {
+              // Decrypt only essential fields for listing
+              const decryptedRow = {
+                ...row,
+                project_name: encryptionService.decrypt(row.project_name),
+                assessor_name: encryptionService.decrypt(row.assessor_name),
+                platform: encryptionService.decrypt(row.platform),
+                requested_by: encryptionService.decrypt(row.requested_by),
+              };
+
+              return decryptedRow;
+            });
+
+            resolve(decryptedRows);
+          }
+        }
+      );
+    });
+  },
+
+  // Get findings count for multiple reports efficiently
+  async getFindingsCountByReports(reportIds) {
+    return new Promise((resolve, reject) => {
+      if (reportIds.length === 0) {
+        resolve({});
+        return;
+      }
+
+      const placeholders = reportIds.map(() => "?").join(",");
+      const sql = `
+        SELECT report_id, 
+               COUNT(*) as total_count,
+               SUM(CASE WHEN status = 'OPEN' THEN 1 ELSE 0 END) as open_count
+        FROM findings 
+        WHERE report_id IN (${placeholders})
+        GROUP BY report_id
+      `;
+
+      db.all(sql, reportIds, (err, rows) => {
+        if (err) reject(err);
+        else {
+          const counts = {};
+          rows.forEach((row) => {
+            counts[row.report_id] = {
+              total: row.total_count,
+              open: row.open_count,
+            };
+          });
+          resolve(counts);
+        }
+      });
+    });
+  },
+
   // Findings
   async createFinding(reportId, findingData) {
     return new Promise((resolve, reject) => {
@@ -608,4 +671,4 @@ const dbHelpers = {
   },
 };
 
-module.exports = { db, dbHelpers };
+module.exports = { dbHelpers, db };

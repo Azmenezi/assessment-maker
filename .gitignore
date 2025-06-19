@@ -22,4 +22,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+./server/assessment_maker.db
 server/assessment_maker.db
+/Users/abdulazizalenezi/Desktop/development/react/assessment-maker/server/assessment_maker.db
+assessment_maker.db

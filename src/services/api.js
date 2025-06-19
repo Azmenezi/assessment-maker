@@ -36,6 +36,10 @@ class ApiService {
     return this.request("/reports");
   }
 
+  async getAllReportsFull() {
+    return this.request("/reports/full");
+  }
+
   async getReport(id) {
     return this.request(`/reports/${id}`);
   }

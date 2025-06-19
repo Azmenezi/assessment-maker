@@ -89,12 +89,17 @@ function filterReports(
       const ticketMatch = report.ticketNumber
         ?.toLowerCase()
         .includes(searchLower);
-      const findingMatch = report.detailedFindings?.some(
-        (f) =>
-          f.title?.toLowerCase().includes(searchLower) ||
-          f.category?.toLowerCase().includes(searchLower) ||
-          f.description?.toLowerCase().includes(searchLower)
-      );
+
+      // For finding searches, we'll need to make individual API calls if needed
+      // For now, skip finding-based search for performance (can be enhanced later)
+      const findingMatch =
+        report.detailedFindings?.some(
+          (f) =>
+            f.title?.toLowerCase().includes(searchLower) ||
+            f.category?.toLowerCase().includes(searchLower) ||
+            f.description?.toLowerCase().includes(searchLower)
+        ) || false;
+
       if (
         !nameMatch &&
         !assessorMatch &&
@@ -106,20 +111,26 @@ function filterReports(
       }
     }
 
-    // Filter by severity
+    // Filter by severity - skip for performance unless detailed findings are loaded
     if (severityFilter && severityFilter !== "All") {
-      const hasSeverity = report.detailedFindings?.some(
-        (f) => f.severity === severityFilter
-      );
-      if (!hasSeverity) {
-        return false;
+      if (report.detailedFindings && report.detailedFindings.length > 0) {
+        const hasSeverity = report.detailedFindings.some(
+          (f) => f.severity === severityFilter
+        );
+        if (!hasSeverity) {
+          return false;
+        }
       }
+      // If no detailed findings loaded, include the report (user can load details if needed)
     }
 
-    // Filter by openOnly
+    // Filter by openOnly - use the pre-calculated count for performance
     if (openOnly) {
-      const hasOpen = report.detailedFindings?.some((f) => f.status === "OPEN");
-      if (!hasOpen) return false;
+      const openCount =
+        report.openFindingsCount ||
+        report.detailedFindings?.filter((f) => f.status === "OPEN").length ||
+        0;
+      if (openCount === 0) return false;
     }
 
     return true;
@@ -152,8 +163,8 @@ function filterReports(
           bValue = b.projectStatus?.toLowerCase() || "";
           break;
         case "findingsCount":
-          aValue = a.detailedFindings?.length || 0;
-          bValue = b.detailedFindings?.length || 0;
+          aValue = a.findingsCount || a.detailedFindings?.length || 0;
+          bValue = b.findingsCount || b.detailedFindings?.length || 0;
           break;
         default:
           aValue = new Date(a.startDate);
@@ -412,9 +423,13 @@ function Home() {
 
   // Get findings count and open findings count for each report
   const getReportStats = (report) => {
-    const totalFindings = report.detailedFindings?.length || 0;
+    // Use the pre-calculated counts from the API for better performance
+    const totalFindings =
+      report.findingsCount || report.detailedFindings?.length || 0;
     const openFindings =
-      report.detailedFindings?.filter((f) => f.status === "OPEN").length || 0;
+      report.openFindingsCount ||
+      report.detailedFindings?.filter((f) => f.status === "OPEN").length ||
+      0;
     return { totalFindings, openFindings };
   };
 

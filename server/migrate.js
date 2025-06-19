@@ -107,6 +107,7 @@ async function exportToLocalStorage() {
   console.log("Exporting database to localStorage format...");
 
   try {
+    // Use the full getAllReports for export to get all data
     const reports = await dbHelpers.getAllReports();
     const exportData = [];
 
@@ -146,6 +147,7 @@ async function exportToLocalStorage() {
         buildVersions: report.build_versions,
         projectStatus: report.project_status,
         requestedBy: report.requested_by,
+        fixByDate: report.fix_by_date,
         executiveSummary: report.executive_summary,
         scope: report.scope,
         methodology: report.methodology,

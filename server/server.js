@@ -3,7 +3,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { nanoid } = require("nanoid");
-const { dbHelpers } = require("./database");
+const { dbHelpers, db } = require("./database");
 const { migrateFromLocalStorage, exportToLocalStorage } = require("./migrate");
 
 const app = express();
@@ -30,9 +30,58 @@ const upload = multer({
 
 // REPORTS ENDPOINTS
 
-// Get all reports
+// Get all reports (optimized for listing)
 app.get("/api/reports", async (req, res) => {
   try {
+    console.time("getAllReports");
+
+    // Get reports with minimal data for performance
+    const reports = await dbHelpers.getAllReportsLight();
+
+    // Get findings counts for all reports in one query
+    const reportIds = reports.map((r) => r.id);
+    const findingsCounts = await dbHelpers.getFindingsCountByReports(reportIds);
+
+    // Format response with minimal processing
+    const formattedReports = reports.map((report) => {
+      const counts = findingsCounts[report.id] || { total: 0, open: 0 };
+
+      return {
+        id: report.id,
+        projectName: report.project_name,
+        version: report.version,
+        assessmentType: report.assessment_type,
+        startDate: report.start_date,
+        endDate: report.end_date,
+        assessorName: report.assessor_name,
+        platform: report.platform,
+        projectStatus: report.project_status,
+        requestedBy: report.requested_by,
+        fixByDate: report.fix_by_date,
+        parentAssessmentId: report.parent_assessment_id,
+        createdAt: report.created_at,
+        updatedAt: report.updated_at,
+        // Add findings count without loading full data
+        findingsCount: counts.total,
+        openFindingsCount: counts.open,
+        // Minimal findings array for compatibility
+        detailedFindings: [],
+      };
+    });
+
+    console.timeEnd("getAllReports");
+    res.json(formattedReports);
+  } catch (error) {
+    console.error("Error fetching reports:", error);
+    res.status(500).json({ error: "Failed to fetch reports" });
+  }
+});
+
+// Get all reports with full details (for export/migration)
+app.get("/api/reports/full", async (req, res) => {
+  try {
+    console.time("getAllReportsFull");
+
     const reports = await dbHelpers.getAllReports();
 
     // Convert database format to frontend format
@@ -87,10 +136,11 @@ app.get("/api/reports", async (req, res) => {
       })
     );
 
+    console.timeEnd("getAllReportsFull");
     res.json(formattedReports);
   } catch (error) {
-    console.error("Error fetching reports:", error);
-    res.status(500).json({ error: "Failed to fetch reports" });
+    console.error("Error fetching full reports:", error);
+    res.status(500).json({ error: "Failed to fetch full reports" });
   }
 });
 
@@ -537,22 +587,37 @@ app.get("/api/migrate/export", async (req, res) => {
 // Get database statistics
 app.get("/api/stats", async (req, res) => {
   try {
-    const reports = await dbHelpers.getAllReports();
+    console.time("getStats");
 
+    // Use light version for better performance
+    const reports = await dbHelpers.getAllReportsLight();
+    const reportIds = reports.map((r) => r.id);
+    const findingsCounts = await dbHelpers.getFindingsCountByReports(reportIds);
+
+    // Calculate totals efficiently
     let totalImages = 0;
     let totalImageSize = 0;
+    let totalFindings = 0;
 
-    for (const report of reports) {
-      const findings = await dbHelpers.getFindingsByReport(report.id);
-      for (const finding of findings) {
-        const images = await dbHelpers.getImagesByFinding(finding.id);
-        totalImages += images.length;
-        totalImageSize += images.reduce(
-          (sum, img) => sum + (img.file_size || 0),
-          0
-        );
-      }
-    }
+    // Get image stats from database directly
+    const imageStats = await new Promise((resolve, reject) => {
+      db.get(
+        "SELECT COUNT(*) as count, SUM(file_size) as total_size FROM images",
+        [],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    totalImages = imageStats.count || 0;
+    totalImageSize = imageStats.total_size || 0;
+
+    // Calculate total findings from counts
+    Object.values(findingsCounts).forEach((count) => {
+      totalFindings += count.total;
+    });
 
     const initialReports = reports.filter(
       (r) => r.assessment_type === "Initial"
@@ -561,11 +626,16 @@ app.get("/api/stats", async (req, res) => {
       (r) => r.assessment_type === "Reassessment"
     ).length;
 
+    console.timeEnd("getStats");
+
     res.json({
       reports: {
         total: reports.length,
         initial: initialReports,
         reassessments: reassessments,
+      },
+      findings: {
+        total: totalFindings,
       },
       images: {
         total: totalImages,

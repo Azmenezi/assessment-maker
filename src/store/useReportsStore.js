@@ -9,12 +9,24 @@ const useReportsStore = create((set, get) => ({
   // Initialize reports from API
   initializeReports: async () => {
     set({ loading: true, error: null });
+    const startTime = performance.now();
+
     try {
       const reports = await apiService.getAllReports();
+      const endTime = performance.now();
+      const loadTime = Math.round(endTime - startTime);
+
+      console.log(
+        `📊 Reports loaded in ${loadTime}ms (${reports.length} reports)`
+      );
       set({ reports, loading: false });
     } catch (error) {
-      console.error("Failed to initialize reports:", error);
+      const endTime = performance.now();
+      const loadTime = Math.round(endTime - startTime);
+
+      console.error(`❌ Failed to load reports after ${loadTime}ms:`, error);
       set({ error: error.message, loading: false });
+
       // Fallback to localStorage for offline mode
       const localReports =
         JSON.parse(localStorage.getItem("pentest_reports")) || [];
