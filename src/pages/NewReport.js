@@ -78,6 +78,7 @@ function NewReport() {
   const projectStatusOptions = [
     "In Progress",
     "Complete",
+    "Completed with Exception",
     "Waiting for Fixes",
     "Waiting for Client Response",
     "On Hold",

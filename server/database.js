@@ -1,5 +1,6 @@
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
+const encryptionService = require("./encryption");
 
 // Create database connection
 const dbPath = path.join(__dirname, "assessment_maker.db");
@@ -9,6 +10,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
   } else {
     console.log("Connected to SQLite database");
     initDatabase();
+    // Test encryption system
+    encryptionService.test();
   }
 });
 
@@ -31,6 +34,7 @@ function initDatabase() {
       build_versions TEXT,
       project_status TEXT,
       requested_by TEXT,
+      fix_by_date TEXT,
       executive_summary TEXT,
       scope TEXT,
       methodology TEXT,
@@ -42,6 +46,19 @@ function initDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Add the fix_by_date column if it doesn't exist (for existing databases)
+  db.run(
+    `
+    ALTER TABLE reports ADD COLUMN fix_by_date TEXT
+  `,
+    (err) => {
+      // Ignore error if column already exists
+      if (err && !err.message.includes("duplicate column name")) {
+        console.error("Error adding fix_by_date column:", err);
+      }
+    }
+  );
 
   // Findings table
   db.run(`
@@ -113,6 +130,7 @@ const dbHelpers = {
         buildVersions,
         projectStatus,
         requestedBy,
+        fixByDate,
         executiveSummary,
         scope,
         methodology,
@@ -122,40 +140,70 @@ const dbHelpers = {
         parentAssessmentData,
       } = reportData;
 
+      // Encrypt sensitive fields
+      const sensitiveFields = encryptionService.getSensitiveFields().reports;
+      const encryptedData = {
+        id,
+        projectName: encryptionService.encrypt(projectName),
+        version,
+        assessmentType,
+        startDate,
+        endDate,
+        assessorName: encryptionService.encrypt(assessorName),
+        platform: encryptionService.encrypt(platform),
+        urls: encryptionService.encrypt(urls),
+        credentials: encryptionService.encrypt(credentials),
+        ticketNumber: encryptionService.encrypt(ticketNumber),
+        buildVersions: encryptionService.encrypt(buildVersions),
+        projectStatus,
+        requestedBy: encryptionService.encrypt(requestedBy),
+        fixByDate,
+        executiveSummary: encryptionService.encrypt(executiveSummary),
+        scope: encryptionService.encrypt(scope),
+        methodology: encryptionService.encrypt(methodology),
+        conclusion: encryptionService.encrypt(conclusion),
+        logo,
+        parentAssessmentId,
+        parentAssessmentData: encryptionService.encrypt(
+          JSON.stringify(parentAssessmentData)
+        ),
+      };
+
       const sql = `
         INSERT INTO reports (
           id, project_name, version, assessment_type, start_date, end_date,
           assessor_name, platform, urls, credentials, ticket_number,
-          build_versions, project_status, requested_by, executive_summary,
-          scope, methodology, conclusion, logo, parent_assessment_id,
-          parent_assessment_data
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          build_versions, project_status, requested_by, fix_by_date,
+          executive_summary, scope, methodology, conclusion, logo, 
+          parent_assessment_id, parent_assessment_data
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       db.run(
         sql,
         [
-          id,
-          projectName,
-          version,
-          assessmentType,
-          startDate,
-          endDate,
-          assessorName,
-          platform,
-          urls,
-          credentials,
-          ticketNumber,
-          buildVersions,
-          projectStatus,
-          requestedBy,
-          executiveSummary,
-          scope,
-          methodology,
-          conclusion,
-          logo,
-          parentAssessmentId,
-          JSON.stringify(parentAssessmentData),
+          encryptedData.id,
+          encryptedData.projectName,
+          encryptedData.version,
+          encryptedData.assessmentType,
+          encryptedData.startDate,
+          encryptedData.endDate,
+          encryptedData.assessorName,
+          encryptedData.platform,
+          encryptedData.urls,
+          encryptedData.credentials,
+          encryptedData.ticketNumber,
+          encryptedData.buildVersions,
+          encryptedData.projectStatus,
+          encryptedData.requestedBy,
+          encryptedData.fixByDate,
+          encryptedData.executiveSummary,
+          encryptedData.scope,
+          encryptedData.methodology,
+          encryptedData.conclusion,
+          encryptedData.logo,
+          encryptedData.parentAssessmentId,
+          encryptedData.parentAssessmentData,
         ],
         function (err) {
           if (err) reject(err);
@@ -170,15 +218,27 @@ const dbHelpers = {
       const fields = [];
       const values = [];
 
-      // Build dynamic update query
+      // Build dynamic update query with encryption
       Object.keys(reportData).forEach((key) => {
+        const dbField = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+
         if (key === "parentAssessmentData") {
           fields.push("parent_assessment_data = ?");
-          values.push(JSON.stringify(reportData[key]));
+          values.push(
+            encryptionService.encrypt(JSON.stringify(reportData[key]))
+          );
         } else {
-          const dbField = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+          // Check if this field should be encrypted
+          const sensitiveFields =
+            encryptionService.getSensitiveFields().reports;
+          const shouldEncrypt = sensitiveFields.includes(dbField);
+
           fields.push(`${dbField} = ?`);
-          values.push(reportData[key]);
+          values.push(
+            shouldEncrypt
+              ? encryptionService.encrypt(reportData[key])
+              : reportData[key]
+          );
         }
       });
 
@@ -199,16 +259,43 @@ const dbHelpers = {
       db.get("SELECT * FROM reports WHERE id = ?", [id], (err, row) => {
         if (err) reject(err);
         else {
-          if (row && row.parent_assessment_data) {
-            try {
-              row.parent_assessment_data = JSON.parse(
-                row.parent_assessment_data
-              );
-            } catch (e) {
-              row.parent_assessment_data = null;
+          if (row) {
+            // Decrypt sensitive fields
+            const decryptedRow = {
+              ...row,
+              project_name: encryptionService.decrypt(row.project_name),
+              assessor_name: encryptionService.decrypt(row.assessor_name),
+              platform: encryptionService.decrypt(row.platform),
+              urls: encryptionService.decrypt(row.urls),
+              credentials: encryptionService.decrypt(row.credentials),
+              ticket_number: encryptionService.decrypt(row.ticket_number),
+              build_versions: encryptionService.decrypt(row.build_versions),
+              requested_by: encryptionService.decrypt(row.requested_by),
+              executive_summary: encryptionService.decrypt(
+                row.executive_summary
+              ),
+              scope: encryptionService.decrypt(row.scope),
+              methodology: encryptionService.decrypt(row.methodology),
+              conclusion: encryptionService.decrypt(row.conclusion),
+            };
+
+            // Handle parent assessment data
+            if (decryptedRow.parent_assessment_data) {
+              try {
+                const decryptedParentData = encryptionService.decrypt(
+                  decryptedRow.parent_assessment_data
+                );
+                decryptedRow.parent_assessment_data =
+                  JSON.parse(decryptedParentData);
+              } catch (e) {
+                decryptedRow.parent_assessment_data = null;
+              }
             }
+
+            resolve(decryptedRow);
+          } else {
+            resolve(row);
           }
-          resolve(row);
         }
       });
     });
@@ -222,18 +309,43 @@ const dbHelpers = {
         (err, rows) => {
           if (err) reject(err);
           else {
-            rows.forEach((row) => {
-              if (row.parent_assessment_data) {
+            const decryptedRows = rows.map((row) => {
+              // Decrypt sensitive fields
+              const decryptedRow = {
+                ...row,
+                project_name: encryptionService.decrypt(row.project_name),
+                assessor_name: encryptionService.decrypt(row.assessor_name),
+                platform: encryptionService.decrypt(row.platform),
+                urls: encryptionService.decrypt(row.urls),
+                credentials: encryptionService.decrypt(row.credentials),
+                ticket_number: encryptionService.decrypt(row.ticket_number),
+                build_versions: encryptionService.decrypt(row.build_versions),
+                requested_by: encryptionService.decrypt(row.requested_by),
+                executive_summary: encryptionService.decrypt(
+                  row.executive_summary
+                ),
+                scope: encryptionService.decrypt(row.scope),
+                methodology: encryptionService.decrypt(row.methodology),
+                conclusion: encryptionService.decrypt(row.conclusion),
+              };
+
+              // Handle parent assessment data
+              if (decryptedRow.parent_assessment_data) {
                 try {
-                  row.parent_assessment_data = JSON.parse(
-                    row.parent_assessment_data
+                  const decryptedParentData = encryptionService.decrypt(
+                    decryptedRow.parent_assessment_data
                   );
+                  decryptedRow.parent_assessment_data =
+                    JSON.parse(decryptedParentData);
                 } catch (e) {
-                  row.parent_assessment_data = null;
+                  decryptedRow.parent_assessment_data = null;
                 }
               }
+
+              return decryptedRow;
             });
-            resolve(rows);
+
+            resolve(decryptedRows);
           }
         }
       );
@@ -263,6 +375,20 @@ const dbHelpers = {
         affectedEndpoints,
       } = findingData;
 
+      // Encrypt sensitive fields
+      const encryptedData = {
+        title: encryptionService.encrypt(title),
+        category,
+        severity,
+        description: encryptionService.encrypt(description),
+        impact: encryptionService.encrypt(impact),
+        mitigation: encryptionService.encrypt(mitigation),
+        status,
+        affectedEndpoints: encryptionService.encrypt(
+          JSON.stringify(affectedEndpoints || [])
+        ),
+      };
+
       const sql = `
         INSERT INTO findings (
           report_id, title, category, severity, description, impact, mitigation, status, affected_endpoints
@@ -273,14 +399,14 @@ const dbHelpers = {
         sql,
         [
           reportId,
-          title,
-          category,
-          severity,
-          description,
-          impact,
-          mitigation,
-          status,
-          JSON.stringify(affectedEndpoints || []),
+          encryptedData.title,
+          encryptedData.category,
+          encryptedData.severity,
+          encryptedData.description,
+          encryptedData.impact,
+          encryptedData.mitigation,
+          encryptedData.status,
+          encryptedData.affectedEndpoints,
         ],
         function (err) {
           if (err) reject(err);
@@ -303,6 +429,20 @@ const dbHelpers = {
         affectedEndpoints,
       } = findingData;
 
+      // Encrypt sensitive fields
+      const encryptedData = {
+        title: encryptionService.encrypt(title),
+        category,
+        severity,
+        description: encryptionService.encrypt(description),
+        impact: encryptionService.encrypt(impact),
+        mitigation: encryptionService.encrypt(mitigation),
+        status,
+        affectedEndpoints: encryptionService.encrypt(
+          JSON.stringify(affectedEndpoints || [])
+        ),
+      };
+
       const sql = `
         UPDATE findings SET 
           title = ?, category = ?, severity = ?, description = ?, impact = ?, 
@@ -313,14 +453,14 @@ const dbHelpers = {
       db.run(
         sql,
         [
-          title,
-          category,
-          severity,
-          description,
-          impact,
-          mitigation,
-          status,
-          JSON.stringify(affectedEndpoints || []),
+          encryptedData.title,
+          encryptedData.category,
+          encryptedData.severity,
+          encryptedData.description,
+          encryptedData.impact,
+          encryptedData.mitigation,
+          encryptedData.status,
+          encryptedData.affectedEndpoints,
           id,
         ],
         function (err) {
@@ -339,16 +479,33 @@ const dbHelpers = {
         (err, rows) => {
           if (err) reject(err);
           else {
-            rows.forEach((row) => {
-              if (row.affected_endpoints) {
+            const decryptedRows = rows.map((row) => {
+              // Decrypt sensitive fields
+              const decryptedRow = {
+                ...row,
+                title: encryptionService.decrypt(row.title),
+                description: encryptionService.decrypt(row.description),
+                impact: encryptionService.decrypt(row.impact),
+                mitigation: encryptionService.decrypt(row.mitigation),
+              };
+
+              // Handle affected endpoints
+              if (decryptedRow.affected_endpoints) {
                 try {
-                  row.affected_endpoints = JSON.parse(row.affected_endpoints);
+                  const decryptedEndpoints = encryptionService.decrypt(
+                    decryptedRow.affected_endpoints
+                  );
+                  decryptedRow.affected_endpoints =
+                    JSON.parse(decryptedEndpoints);
                 } catch (e) {
-                  row.affected_endpoints = [];
+                  decryptedRow.affected_endpoints = [];
                 }
               }
+
+              return decryptedRow;
             });
-            resolve(rows);
+
+            resolve(decryptedRows);
           }
         }
       );
@@ -369,6 +526,11 @@ const dbHelpers = {
     return new Promise((resolve, reject) => {
       const { filename, originalName, mimeType, fileSize, buffer } = imageData;
 
+      // Encrypt image data and sensitive metadata
+      const encryptedBuffer = encryptionService.encryptImage(buffer);
+      const encryptedFilename = encryptionService.encrypt(filename);
+      const encryptedOriginalName = encryptionService.encrypt(originalName);
+
       const sql = `
         INSERT INTO images (finding_id, filename, original_name, mime_type, file_size, image_data)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -376,7 +538,14 @@ const dbHelpers = {
 
       db.run(
         sql,
-        [findingId, filename, originalName, mimeType, fileSize, buffer],
+        [
+          findingId,
+          encryptedFilename,
+          encryptedOriginalName,
+          mimeType,
+          fileSize,
+          encryptedBuffer,
+        ],
         function (err) {
           if (err) reject(err);
           else resolve({ id: this.lastID, changes: this.changes });
@@ -392,7 +561,16 @@ const dbHelpers = {
         [findingId],
         (err, rows) => {
           if (err) reject(err);
-          else resolve(rows);
+          else {
+            const decryptedRows = rows.map((row) => ({
+              ...row,
+              filename: encryptionService.decrypt(row.filename),
+              original_name: encryptionService.decrypt(row.original_name),
+              image_data: encryptionService.decryptImage(row.image_data),
+            }));
+
+            resolve(decryptedRows);
+          }
         }
       );
     });
@@ -402,7 +580,20 @@ const dbHelpers = {
     return new Promise((resolve, reject) => {
       db.get("SELECT * FROM images WHERE id = ?", [id], (err, row) => {
         if (err) reject(err);
-        else resolve(row);
+        else {
+          if (row) {
+            // Decrypt image data and metadata
+            const decryptedRow = {
+              ...row,
+              filename: encryptionService.decrypt(row.filename),
+              original_name: encryptionService.decrypt(row.original_name),
+              image_data: encryptionService.decryptImage(row.image_data),
+            };
+            resolve(decryptedRow);
+          } else {
+            resolve(row);
+          }
+        }
       });
     });
   },

@@ -9,6 +9,7 @@
     "@mui/material": "^6.1.10",
     "cors": "^2.8.5",
     "cra-template": "1.2.0",
+    "crypto-js": "^4.2.0",
     "docx": "^9.1.0",
     "electron-builder": "^25.1.8",
     "express": "^5.1.0",

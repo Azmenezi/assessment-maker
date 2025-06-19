@@ -72,6 +72,7 @@ app.get("/api/reports", async (req, res) => {
           buildVersions: report.build_versions,
           projectStatus: report.project_status,
           requestedBy: report.requested_by,
+          fixByDate: report.fix_by_date,
           executiveSummary: report.executive_summary,
           scope: report.scope,
           methodology: report.methodology,
@@ -135,6 +136,7 @@ app.get("/api/reports/:id", async (req, res) => {
       buildVersions: report.build_versions,
       projectStatus: report.project_status,
       requestedBy: report.requested_by,
+      fixByDate: report.fix_by_date,
       executiveSummary: report.executive_summary,
       scope: report.scope,
       methodology: report.methodology,
@@ -582,6 +584,38 @@ app.get("/api/findings-library", async (req, res) => {
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
+// Encryption status endpoint
+app.get("/api/encryption/status", (req, res) => {
+  try {
+    const encryptionService = require("./encryption");
+
+    // Test encryption/decryption
+    const testResult = encryptionService.test();
+
+    res.json({
+      status: "enabled",
+      algorithm: "AES-256-CBC",
+      keyDerivation: "PBKDF2",
+      saltSize: 256,
+      ivSize: 128,
+      iterations: 10000,
+      testPassed: testResult,
+      timestamp: new Date().toISOString(),
+      encryptedFields: {
+        reports: encryptionService.getSensitiveFields().reports,
+        findings: encryptionService.getSensitiveFields().findings,
+        images: encryptionService.getSensitiveFields().images,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // Error handling middleware

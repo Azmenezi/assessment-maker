@@ -1,5 +1,8 @@
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import EditIcon from "@mui/icons-material/Edit";
+import CheckBoxIcon from "@mui/icons-material/CheckBox";
+import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import {
   Accordion,
   AccordionDetails,
@@ -21,10 +24,17 @@ import {
   Select,
   TextField,
   Typography,
+  Toolbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Fade,
 } from "@mui/material";
-import React from "react";
+import React, { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import useReportsStore from "../store/useReportsStore";
+import { ToastContext } from "../App";
 
 function filterReports(
   reports,
@@ -174,6 +184,7 @@ function ReportsFilter({ onFilterChange }) {
     "All",
     "In Progress",
     "Complete",
+    "Completed with Exception",
     "Waiting for Fixes",
     "Waiting for Client Response",
     "On Hold",
@@ -372,7 +383,9 @@ function ReportsFilter({ onFilterChange }) {
 
 function Home() {
   const reports = useReportsStore((state) => state.reports);
+  const updateReport = useReportsStore((state) => state.updateReport);
   const navigate = useNavigate();
+  const toast = useContext(ToastContext);
 
   const [filters, setFilters] = React.useState({
     fromDate: "",
@@ -385,6 +398,13 @@ function Home() {
     sortBy: "startDate",
     sortOrder: "desc",
   });
+
+  // Bulk edit state
+  const [bulkEditMode, setBulkEditMode] = React.useState(false);
+  const [selectedReports, setSelectedReports] = React.useState(new Set());
+  const [bulkEditDialog, setBulkEditDialog] = React.useState(false);
+  const [bulkStatus, setBulkStatus] = React.useState("");
+  const [bulkFixByDate, setBulkFixByDate] = React.useState("");
 
   const filteredReports = React.useMemo(() => {
     return filterReports(reports, filters);
@@ -403,6 +423,8 @@ function Home() {
     switch (status) {
       case "Complete":
         return "success";
+      case "Completed with Exception":
+        return "warning";
       case "In Progress":
         return "info";
       case "Waiting for Fixes":
@@ -418,6 +440,125 @@ function Home() {
         return "default";
     }
   };
+
+  const projectStatusOptions = [
+    "In Progress",
+    "Complete",
+    "Completed with Exception",
+    "Waiting for Fixes",
+    "Waiting for Client Response",
+    "On Hold",
+    "Cancelled",
+    "Ready for Review",
+    "Under Review",
+  ];
+
+  // Bulk edit functions
+  const handleSelectAll = () => {
+    if (selectedReports.size === filteredReports.length) {
+      setSelectedReports(new Set());
+    } else {
+      setSelectedReports(new Set(filteredReports.map((r) => r.id)));
+    }
+  };
+
+  const handleSelectReport = (reportId) => {
+    const newSelected = new Set(selectedReports);
+    if (newSelected.has(reportId)) {
+      newSelected.delete(reportId);
+    } else {
+      newSelected.add(reportId);
+    }
+    setSelectedReports(newSelected);
+  };
+
+  const handleBulkStatusChange = async () => {
+    if (!bulkStatus || selectedReports.size === 0) return;
+
+    // Validate fix-by date if status is "Completed with Exception"
+    if (bulkStatus === "Completed with Exception" && !bulkFixByDate) {
+      toast.error(
+        "Please select a fix-by date for 'Completed with Exception' status"
+      );
+      return;
+    }
+
+    try {
+      const updatePromises = Array.from(selectedReports).map((reportId) => {
+        const report = reports.find((r) => r.id === reportId);
+        const updatedReport = {
+          ...report,
+          projectStatus: bulkStatus,
+        };
+
+        // Add fix-by date if status is "Completed with Exception"
+        if (bulkStatus === "Completed with Exception") {
+          updatedReport.fixByDate = bulkFixByDate;
+        } else {
+          // Remove fix-by date if changing from "Completed with Exception" to another status
+          delete updatedReport.fixByDate;
+        }
+
+        return updateReport(reportId, updatedReport);
+      });
+
+      await Promise.all(updatePromises);
+
+      toast.success(
+        `Updated ${selectedReports.size} reports to "${bulkStatus}"${
+          bulkStatus === "Completed with Exception"
+            ? ` (Fix by: ${bulkFixByDate})`
+            : ""
+        }`
+      );
+      setSelectedReports(new Set());
+      setBulkEditDialog(false);
+      setBulkEditMode(false);
+      setBulkStatus("");
+      setBulkFixByDate("");
+    } catch (error) {
+      toast.error("Failed to update reports: " + error.message);
+    }
+  };
+
+  const handleExitBulkMode = () => {
+    if (selectedReports.size > 0) {
+      // Show confirmation if there are selected reports
+      if (
+        window.confirm(
+          `You have ${selectedReports.size} reports selected. Are you sure you want to exit bulk edit mode?`
+        )
+      ) {
+        setBulkEditMode(false);
+        setSelectedReports(new Set());
+      }
+    } else {
+      setBulkEditMode(false);
+      setSelectedReports(new Set());
+    }
+  };
+
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Ctrl/Cmd + A to select all when in bulk edit mode
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key === "a" &&
+        bulkEditMode
+      ) {
+        event.preventDefault();
+        handleSelectAll();
+      }
+      // Escape to exit bulk edit mode
+      if (event.key === "Escape" && bulkEditMode) {
+        handleExitBulkMode();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [bulkEditMode, selectedReports.size]);
 
   return (
     <Container>
@@ -489,6 +630,89 @@ function Home() {
         Create New Report
       </Button>
 
+      {/* Bulk Edit Toolbar */}
+      {bulkEditMode && (
+        <Paper
+          elevation={3}
+          sx={{
+            p: 2,
+            mb: 2,
+            bgcolor: "primary.light",
+            color: "primary.contrastText",
+          }}
+        >
+          <Toolbar sx={{ px: 0 }}>
+            <Box display="flex" alignItems="center" gap={2} flexGrow={1}>
+              <Checkbox
+                checked={
+                  selectedReports.size === filteredReports.length &&
+                  filteredReports.length > 0
+                }
+                indeterminate={
+                  selectedReports.size > 0 &&
+                  selectedReports.size < filteredReports.length
+                }
+                onChange={handleSelectAll}
+                icon={<CheckBoxOutlineBlankIcon />}
+                checkedIcon={<CheckBoxIcon />}
+                sx={{ color: "primary.contrastText" }}
+              />
+              <Typography variant="h6">
+                {selectedReports.size} of {filteredReports.length} reports
+                selected
+              </Typography>
+            </Box>
+            <Box display="flex" gap={1}>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<EditIcon />}
+                onClick={() => setBulkEditDialog(true)}
+                disabled={selectedReports.size === 0}
+              >
+                Change Status
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={handleExitBulkMode}
+              >
+                Exit Bulk Edit
+              </Button>
+            </Box>
+          </Toolbar>
+        </Paper>
+      )}
+
+      {/* Bulk Edit Mode Toggle */}
+      <Box display="flex" gap={2} alignItems="center" marginBottom={2}>
+        <Button
+          variant={bulkEditMode ? "contained" : "outlined"}
+          color="primary"
+          onClick={() => setBulkEditMode(!bulkEditMode)}
+        >
+          {bulkEditMode ? "Exit Bulk Edit" : "Bulk Edit Mode"}
+        </Button>
+        {bulkEditMode && (
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              Click checkboxes to select reports for bulk editing • Use Ctrl+A
+              to select all • Press Escape to exit
+            </Typography>
+            {selectedReports.size > 0 && (
+              <Typography
+                variant="body2"
+                color="primary.main"
+                fontWeight="bold"
+              >
+                {selectedReports.size} report
+                {selectedReports.size !== 1 ? "s" : ""} selected
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Box>
+
       <ReportsFilter onFilterChange={setFilters} />
 
       {/* Quick Filter Buttons */}
@@ -528,6 +752,23 @@ function Home() {
         </Button>
         <Button
           variant={
+            filters.projectStatus === "Completed with Exception"
+              ? "contained"
+              : "outlined"
+          }
+          size="small"
+          color="warning"
+          onClick={() =>
+            setFilters((prev) => ({
+              ...prev,
+              projectStatus: "Completed with Exception",
+            }))
+          }
+        >
+          Completed with Exception
+        </Button>
+        <Button
+          variant={
             filters.projectStatus === "Waiting for Fixes"
               ? "contained"
               : "outlined"
@@ -558,11 +799,11 @@ function Home() {
       <List>
         {filteredReports.map((report) => {
           const stats = getReportStats(report);
+          const isSelected = selectedReports.has(report.id);
+
           return (
             <ListItem
-              button
               key={report.id}
-              onClick={() => navigate(`/edit/${report.id}`)}
               style={{
                 border: "1px solid #e0e0e0",
                 borderRadius: "8px",
@@ -570,10 +811,29 @@ function Home() {
                 backgroundColor:
                   report.assessmentType === "Reassessment"
                     ? "#f5f5f5"
+                    : isSelected
+                    ? "#e3f2fd"
                     : "white",
               }}
             >
+              {bulkEditMode && (
+                <Checkbox
+                  checked={isSelected}
+                  onChange={() => handleSelectReport(report.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  sx={{ mr: 1 }}
+                />
+              )}
+
               <ListItemText
+                onClick={() => {
+                  if (bulkEditMode) {
+                    handleSelectReport(report.id);
+                  } else {
+                    navigate(`/edit/${report.id}`);
+                  }
+                }}
+                sx={{ cursor: "pointer" }}
                 primary={
                   <Box display="flex" alignItems="center" gap={1}>
                     <Typography variant="h6">
@@ -596,6 +856,15 @@ function Home() {
                       size="small"
                       variant="outlined"
                     />
+                    {report.projectStatus === "Completed with Exception" &&
+                      report.fixByDate && (
+                        <Chip
+                          label={`Fix by: ${report.fixByDate}`}
+                          color="warning"
+                          size="small"
+                          variant="filled"
+                        />
+                      )}
                     {stats.totalFindings > 0 && (
                       <Chip
                         label={`${stats.openFindings}/${stats.totalFindings} findings`}
@@ -638,6 +907,91 @@ function Home() {
           No reports found matching the current filters.
         </Typography>
       )}
+
+      {/* Bulk Edit Dialog */}
+      <Dialog
+        open={bulkEditDialog}
+        onClose={() => setBulkEditDialog(false)}
+        aria-labelledby="bulk-edit-dialog-title"
+        aria-describedby="bulk-edit-dialog-description"
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle id="bulk-edit-dialog-title">
+          Bulk Edit Status - {selectedReports.size} Reports
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            You are about to change the status for the following reports:
+          </Typography>
+
+          <Box sx={{ mb: 3, maxHeight: 200, overflowY: "auto" }}>
+            {Array.from(selectedReports).map((reportId) => {
+              const report = reports.find((r) => r.id === reportId);
+              return report ? (
+                <Box
+                  key={reportId}
+                  sx={{ mb: 1, p: 1, bgcolor: "grey.50", borderRadius: 1 }}
+                >
+                  <Typography variant="body2" fontWeight="bold">
+                    {report.projectName} - v{report.version}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Current Status: {report.projectStatus || "In Progress"}
+                  </Typography>
+                </Box>
+              ) : null;
+            })}
+          </Box>
+
+          <FormControl fullWidth>
+            <InputLabel>New Project Status</InputLabel>
+            <Select
+              value={bulkStatus}
+              onChange={(e) => setBulkStatus(e.target.value)}
+              label="New Project Status"
+            >
+              {projectStatusOptions.map((status) => (
+                <MenuItem key={status} value={status}>
+                  {status}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {bulkStatus === "Completed with Exception" && (
+            <Box sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                type="date"
+                label="Fix By Date"
+                value={bulkFixByDate}
+                onChange={(e) => setBulkFixByDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                helperText="Select the date by which the exceptions should be fixed"
+                required
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkEditDialog(false)} color="primary">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleBulkStatusChange}
+            color="primary"
+            variant="contained"
+            disabled={
+              !bulkStatus ||
+              (bulkStatus === "Completed with Exception" && !bulkFixByDate)
+            }
+            autoFocus
+          >
+            Update {selectedReports.size} Reports
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

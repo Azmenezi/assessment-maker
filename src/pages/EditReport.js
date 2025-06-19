@@ -203,6 +203,7 @@ function EditReport() {
   const projectStatusOptions = [
     "In Progress",
     "Complete",
+    "Completed with Exception",
     "Waiting for Fixes",
     "Waiting for Client Response",
     "On Hold",
@@ -277,6 +278,7 @@ function EditReport() {
   const [buildVersions, setBuildVersions] = useState("");
   const [projectStatus, setProjectStatus] = useState("In Progress");
   const [requestedBy, setRequestedBy] = useState("Digital Factory Division");
+  const [fixByDate, setFixByDate] = useState("");
 
   // State for selected finding details dialog
   const [selectedFinding, setSelectedFinding] = useState(null);
@@ -310,6 +312,7 @@ function EditReport() {
       setBuildVersions(report.buildVersions || "");
       setProjectStatus(report.projectStatus || "In Progress");
       setRequestedBy(report.requestedBy || "Digital Factory Division");
+      setFixByDate(report.fixByDate || "");
 
       // Parse existing URLs into endpoints if they look like API endpoints
       if (report.urls) {
@@ -383,6 +386,7 @@ function EditReport() {
         buildVersions,
         projectStatus,
         requestedBy,
+        fixByDate,
       });
 
       // Add new findings to library if not duplicate
@@ -1039,6 +1043,20 @@ function EditReport() {
                 ))}
               </TextField>
             </Box>
+
+            {projectStatus === "Completed with Exception" && (
+              <Box mt={2} mb={2}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Fix By Date"
+                  value={fixByDate}
+                  onChange={(e) => setFixByDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Select the date by which the exceptions should be fixed"
+                />
+              </Box>
+            )}
 
             <TextField
               label="Assessor Name"
