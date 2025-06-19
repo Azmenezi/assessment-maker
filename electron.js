@@ -3,102 +3,32 @@ const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { v4: uuidv4 } = require("uuid");
 
 let mainWindow;
 
-// Function to detect React dev server port
-async function detectReactPort() {
-  const http = require("http");
-
-  const checkPort = (port) => {
-    return new Promise((resolve) => {
-      const req = http.get(`http://localhost:${port}`, (res) => {
-        resolve(true);
-      });
-      req.on("error", () => {
-        resolve(false);
-      });
-      req.setTimeout(1000, () => {
-        req.destroy();
-        resolve(false);
-      });
-    });
-  };
-
-  // Check common React dev server ports
-  const portsToCheck = [3000, 3001, 3002, 3003];
-
-  for (const port of portsToCheck) {
-    const isAvailable = await checkPort(port);
-    if (isAvailable) {
-      console.log(`Found React dev server on port ${port}`);
-      return port;
-    }
-  }
-
-  console.log("No React dev server found, defaulting to port 3000");
-  return 3000;
-}
-
-async function createWindow() {
+function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1200,
+    height: 800,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
     },
-    show: false, // Don't show until ready
   });
 
   // For production:
-  const isDev = process.env.NODE_ENV === "development";
+  mainWindow.loadURL(`file://${path.join(__dirname, "build", "index.html")}`);
 
-  if (isDev) {
-    // For development: detect React port dynamically
-    const reactPort = await detectReactPort();
-    const devUrl = `http://localhost:${reactPort}`;
-    console.log(`Loading React app from: ${devUrl}`);
-
-    mainWindow.loadURL(devUrl);
-    mainWindow.webContents.openDevTools();
-  } else {
-    // For production:
-    mainWindow.loadURL(`file://${path.join(__dirname, "build", "index.html")}`);
-  }
-
-  // Show window when ready to prevent white screen
-  mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
-  });
-
-  // Handle navigation errors
-  mainWindow.webContents.on(
-    "did-fail-load",
-    (event, errorCode, errorDescription) => {
-      console.error("Failed to load:", errorCode, errorDescription);
-
-      // If in development and failed to load, try other ports
-      if (isDev) {
-        console.log("Retrying with different ports...");
-        setTimeout(async () => {
-          const newPort = await detectReactPort();
-          const newUrl = `http://localhost:${newPort}`;
-          console.log(`Retrying with: ${newUrl}`);
-          mainWindow.loadURL(newUrl);
-        }, 2000);
-      }
-    }
-  );
+  // For development:
+  mainWindow.loadURL("http://localhost:3000");
 }
 
-app.whenReady().then(async () => {
-  await createWindow();
+app.whenReady().then(() => {
+  createWindow();
 
-  app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
@@ -108,156 +38,13 @@ app.on("window-all-closed", () => {
   }
 });
 
-// Define application data directories
-const appDataDir = path.join(os.homedir(), "Documents", "AssessmentMaker");
-const reportsDir = path.join(appDataDir, "reports");
-const imagesDir = path.join(appDataDir, "images");
-const exportsDir = path.join(os.homedir(), "Desktop", "assessmentReports");
-
-// Create directories if they don't exist
-[appDataDir, reportsDir, imagesDir, exportsDir].forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
+// Define root directory for assessmentReports
+const rootDir = path.join(os.homedir(), "Desktop", "assessmentReports");
+if (!fs.existsSync(rootDir)) {
+  fs.mkdirSync(rootDir);
+}
 
 const { Packer } = require("docx");
-
-// Data storage functions
-function getReportsFilePath() {
-  return path.join(reportsDir, "reports.json");
-}
-
-function loadReports() {
-  const reportsFile = getReportsFilePath();
-  if (fs.existsSync(reportsFile)) {
-    try {
-      const data = fs.readFileSync(reportsFile, "utf8");
-      return JSON.parse(data);
-    } catch (error) {
-      console.error("Error loading reports:", error);
-      return [];
-    }
-  }
-  return [];
-}
-
-function saveReports(reports) {
-  const reportsFile = getReportsFilePath();
-  try {
-    fs.writeFileSync(reportsFile, JSON.stringify(reports, null, 2));
-    return { success: true };
-  } catch (error) {
-    console.error("Error saving reports:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Image storage functions
-function saveImage(imageData, filename) {
-  try {
-    const imageId = uuidv4();
-    const extension = filename.split(".").pop() || "png";
-    const savedFilename = `${imageId}.${extension}`;
-    const imagePath = path.join(imagesDir, savedFilename);
-
-    // Remove data URL prefix and convert to buffer
-    const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-
-    fs.writeFileSync(imagePath, buffer);
-
-    return {
-      success: true,
-      imageId: savedFilename,
-      savedFilename,
-      originalFilename: filename,
-      path: imagePath,
-    };
-  } catch (error) {
-    console.error("Error saving image:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-function getImage(imageFilename) {
-  try {
-    const imagePath = path.join(imagesDir, imageFilename);
-    if (fs.existsSync(imagePath)) {
-      const buffer = fs.readFileSync(imagePath);
-      const base64 = buffer.toString("base64");
-      const mimeType = getMimeType(imagePath);
-      return {
-        success: true,
-        data: `data:${mimeType};base64,${base64}`,
-      };
-    }
-    return { success: false, error: "Image not found" };
-  } catch (error) {
-    console.error("Error loading image:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-function deleteImage(imageFilename) {
-  try {
-    const imagePath = path.join(imagesDir, imageFilename);
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
-      return { success: true };
-    }
-    return { success: false, error: "Image not found" };
-  } catch (error) {
-    console.error("Error deleting image:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-function getMimeType(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-  };
-  return mimeTypes[ext] || "image/png";
-}
-
-// IPC Handlers
-
-// Reports management
-ipcMain.handle("load-reports", async () => {
-  return loadReports();
-});
-
-ipcMain.handle("save-reports", async (event, reports) => {
-  return saveReports(reports);
-});
-
-// Image management
-ipcMain.handle("save-image", async (event, { imageData, filename }) => {
-  return saveImage(imageData, filename);
-});
-
-ipcMain.handle("get-image", async (event, imageFilename) => {
-  return getImage(imageFilename);
-});
-
-ipcMain.handle("delete-image", async (event, imageFilename) => {
-  return deleteImage(imageFilename);
-});
-
-// Get app directories info
-ipcMain.handle("get-app-info", async () => {
-  return {
-    appDataDir,
-    reportsDir,
-    imagesDir,
-    exportsDir,
-  };
-});
 
 // Add folder selection dialog
 ipcMain.handle("select-folder", async () => {
@@ -316,7 +103,7 @@ ipcMain.handle(
     const folderName = projectName.replace(/\s+/g, "_");
 
     // Use provided export path or default
-    const baseDir = exportPath || exportsDir;
+    const baseDir = exportPath || rootDir;
     const projectFolder = path.join(baseDir, folderName);
 
     if (!fs.existsSync(projectFolder)) {

@@ -1,0 +1,34 @@
+{
+  "reports": [
+    {
+      "id": "test-report-1",
+      "projectName": "Test Migration Project",
+      "version": "1.0",
+      "assessmentType": "Initial",
+      "startDate": "2024-01-01",
+      "endDate": "2024-01-15",
+      "assessorName": "Test Assessor",
+      "detailedFindings": [
+        {
+          "title": "SQL Injection Vulnerability",
+          "severity": "High",
+          "category": "Injection",
+          "description": "SQL injection found in login form",
+          "impact": "High impact description",
+          "mitigation": "Use parameterized queries",
+          "status": "OPEN",
+          "pocImages": [
+            {
+              "name": "sql-injection-poc.png",
+              "data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+              "isFileStored": false
+            }
+          ],
+          "affectedEndpoints": ["POST /login", "GET /user/profile"]
+        }
+      ]
+    }
+  ],
+  "templates": [],
+  "findingsLibrary": []
+}

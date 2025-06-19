@@ -560,9 +560,10 @@ function Home() {
           const stats = getReportStats(report);
           return (
             <ListItem
+              button
               key={report.id}
               onClick={() => navigate(`/edit/${report.id}`)}
-              sx={{
+              style={{
                 border: "1px solid #e0e0e0",
                 borderRadius: "8px",
                 marginBottom: "8px",
@@ -570,16 +571,12 @@ function Home() {
                   report.assessmentType === "Reassessment"
                     ? "#f5f5f5"
                     : "white",
-                cursor: "pointer",
-                "&:hover": {
-                  backgroundColor: "#f0f0f0",
-                },
               }}
             >
               <ListItemText
                 primary={
                   <Box display="flex" alignItems="center" gap={1}>
-                    <Typography variant="h6" component="span">
+                    <Typography variant="h6">
                       {report.projectName} - v{report.version}
                     </Typography>
                     <Chip
@@ -610,11 +607,7 @@ function Home() {
                 }
                 secondary={
                   <Box>
-                    <Typography
-                      variant="body2"
-                      color="textSecondary"
-                      component="div"
-                    >
+                    <Typography variant="body2" color="textSecondary">
                       {report.startDate} - {report.endDate}
                     </Typography>
                     {report.assessmentType === "Reassessment" &&
@@ -622,7 +615,6 @@ function Home() {
                         <Typography
                           variant="body2"
                           color="textSecondary"
-                          component="div"
                           style={{ fontStyle: "italic" }}
                         >
                           Based on: {report.parentAssessmentData.projectName} (v

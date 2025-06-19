@@ -1,213 +1,257 @@
 # Assessment Maker
 
-A professional penetration testing report generator built with React and Electron, featuring modern UI components and comprehensive report management.
+A comprehensive penetration testing report generation tool built with React, Express, and SQLite.
 
 ## Features
 
-### Core Functionality
+- **Report Management**: Create, edit, and manage penetration testing reports
+- **Findings Library**: Reusable findings database
+- **Image Storage**: Efficient image handling with automatic compression
+- **Export Options**: PDF, Word, and ZIP exports
+- **Reassessment Tracking**: Version-controlled reassessment chains
+- **Modern UI**: Material-UI components with toast notifications
+- **Offline Support**: Fallback to localStorage when server is unavailable
 
-- **Modern Report Creation**: Create detailed penetration testing reports with structured findings
-- **Reassessment Support**: Generate follow-up assessments with version tracking
-- **Finding Management**: Comprehensive finding library with categorization and severity levels
-- **Professional Export**: Export reports to PDF, Word, and ZIP formats with embedded images
-- **File System Storage**: Robust file-based storage system for unlimited report and image capacity
+## Architecture
 
-### Enhanced User Experience
+### Frontend (React)
 
-- **Toast Notifications**: Non-intrusive notifications for all user actions
-- **Modern Confirmation Dialogs**: Professional confirmation dialogs with contextual icons
-- **Real-time Validation**: Comprehensive form validation with helpful error messages
-- **Advanced Filtering**: Multi-criteria filtering and sorting for report management
-- **Responsive Design**: Modern Material-UI components with professional styling
+- **Framework**: React 18 with hooks
+- **UI Library**: Material-UI (MUI) v6
+- **State Management**: Zustand
+- **Routing**: React Router v7
+- **Export Libraries**: pdfmake, docx, jszip
 
-### Technical Architecture
+### Backend (Express + SQLite)
 
-- **Electron Desktop App**: Native desktop application with file system access
-- **File-Based Storage**: Reports stored as JSON files, images stored as separate files
-- **Image Management**: Automatic image compression and file system storage
-- **Storage Locations**:
-  - Reports: `~/Documents/AssessmentMaker/reports/`
-  - Images: `~/Documents/AssessmentMaker/images/`
-  - Exports: `~/Desktop/assessmentReports/`
+- **Server**: Express.js
+- **Database**: SQLite with BLOB support for images
+- **File Upload**: Multer for image handling
+- **API**: RESTful endpoints for all operations
 
-## Installation
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-
-### Setup
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd assessment-maker
-
-# Install dependencies
-npm install
-
-# Start development server
-npm start
-
-# Build for production
-npm run build
-
-# Package as Electron app
-npm run electron-pack
-```
-
-## Storage System
-
-### File System Architecture
-
-The application uses a robust file system storage approach:
-
-1. **Reports Storage**: JSON files in `~/Documents/AssessmentMaker/reports/`
-2. **Image Storage**: Binary files in `~/Documents/AssessmentMaker/images/`
-3. **Export Location**: `~/Desktop/assessmentReports/`
-
-### Benefits Over localStorage
-
-- **Unlimited Storage**: No 5MB localStorage limitations
-- **Better Performance**: Large images don't slow down the application
-- **Data Persistence**: Files survive browser cache clearing
-- **Professional Architecture**: Proper separation of data and application code
-- **Easy Backup**: Simple file-based backup and restore
-
-### Image Management
-
-- **Automatic Compression**: Images are optimized for storage efficiency
-- **Multiple Formats**: Support for PNG, JPG, GIF, WebP
-- **File Size Limits**: Up to 50MB per image (vs 10MB in localStorage version)
-- **Unique Identifiers**: UUID-based image identification system
-
-## Usage
-
-### Creating Reports
-
-1. Click "New Report" and fill in required fields
-2. Add findings with descriptions, impacts, and mitigation steps
-3. Upload proof-of-concept images for each finding
-4. Save and export in multiple formats
-
-### Managing Images
-
-- Images are automatically compressed and stored in the file system
-- Each image gets a unique identifier for reliable referencing
-- Images are included in ZIP exports for complete documentation
-
-### Reassessments
-
-- Create follow-up assessments from existing reports
-- Automatic version incrementing (v1.0 → v2.0 → v3.0)
-- Track changes between assessment versions
-
-## Development
+## Getting Started
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js 16+
 - npm or yarn
 
 ### Installation
 
-```bash
-npm install
-```
-
-### Development Scripts
-
-#### Cross-Platform (Recommended)
-
-```bash
-# Start React development server
-npm start
-
-# Start Electron in development mode (works on Windows, macOS, Linux)
-npm run electron-dev
-
-# Start both React and Electron together
-npm run start-electron
-```
-
-#### Windows-Specific (Alternative)
-
-If you encounter issues with `npm run electron-dev` on Windows, use:
-
-```bash
-npm run electron-dev-win
-```
-
-#### Development Workflow
-
-1. **Option 1 - Separate terminals:**
+1. **Clone the repository**
 
    ```bash
-   # Terminal 1: Start React dev server
-   npm start
-
-   # Terminal 2: Start Electron (after React is running)
-   npm run electron-dev
+   git clone <repository-url>
+   cd assessment-maker
    ```
 
-2. **Option 2 - Single command:**
+2. **Install dependencies**
+
    ```bash
-   # Starts both React and Electron automatically
-   npm run start-electron
+   npm install
    ```
 
-### Production Build
+3. **Start the development environment**
+
+   ```bash
+   # Start both server and client simultaneously
+   npm run dev
+
+   # Or run separately:
+   npm run server  # Start API server on port 3001
+   npm start       # Start React client on port 3000
+   ```
+
+### Database Setup
+
+The SQLite database is automatically created when you first run the server. The database file will be located at `server/assessment_maker.db`.
+
+#### Database Schema
+
+**Reports Table**
+
+- Basic report information (project name, dates, assessor, etc.)
+- Assessment type (Initial/Reassessment)
+- Parent assessment tracking for reassessments
+
+**Findings Table**
+
+- Finding details (title, severity, description, etc.)
+- Status tracking (OPEN/CLOSED)
+- Affected endpoints
+
+**Images Table**
+
+- BLOB storage for finding images
+- Metadata (filename, size, mime type)
+- Automatic compression and optimization
+
+**Findings Library Table**
+
+- Reusable finding templates
+
+### Migration from localStorage
+
+If you have existing data in localStorage, you can migrate it to the database:
+
+1. **Export localStorage data** (from browser console):
+
+   ```javascript
+   // Copy this data to a file (e.g., backup.json)
+   JSON.stringify(JSON.parse(localStorage.getItem("pentest_reports")), null, 2);
+   ```
+
+2. **Import to database**:
+
+   ```bash
+   cd server
+   node migrate.js import ../backup.json
+   ```
+
+3. **Export database back to JSON** (for backup):
+   ```bash
+   cd server
+   node migrate.js export
+   ```
+
+## API Endpoints
+
+### Reports
+
+- `GET /api/reports` - Get all reports
+- `GET /api/reports/:id` - Get single report
+- `POST /api/reports` - Create new report
+- `PUT /api/reports/:id` - Update report
+- `DELETE /api/reports/:id` - Delete report
+- `POST /api/reports/:id/reassessment` - Create reassessment
+
+### Images
+
+- `POST /api/images/upload` - Upload image
+- `GET /api/images/:id` - Get image
+- `DELETE /api/images/:id` - Delete image
+
+### Findings Library
+
+- `GET /api/findings-library` - Get findings library
+
+### Health Check
+
+- `GET /health` - Server health status
+
+## Development
+
+### Project Structure
+
+```
+assessment-maker/
+├── src/                    # React frontend
+│   ├── components/         # Reusable components
+│   ├── hooks/             # Custom hooks
+│   ├── pages/             # Page components
+│   ├── services/          # API service
+│   ├── store/             # Zustand stores
+│   └── utils/             # Utility functions
+├── server/                # Express backend
+│   ├── database.js        # SQLite setup and helpers
+│   ├── server.js          # Express server
+│   └── migrate.js         # Migration utilities
+└── public/                # Static assets
+```
+
+### Key Features
+
+#### Storage Management
+
+- **Automatic Image Compression**: Images are compressed to reduce storage usage
+- **BLOB Storage**: Efficient binary storage in SQLite
+- **Fallback Support**: Automatic fallback to localStorage if server is unavailable
+
+#### Version Management
+
+- **Smart Versioning**: Automatic version incrementing for reassessments (1.0 → 2.0 → 3.0)
+- **Parent Tracking**: Maintains links between original assessments and reassessments
+- **Historical Data**: Preserves original assessment data in reassessments
+
+#### Export System
+
+- **Multiple Formats**: PDF, Word document, and ZIP archives
+- **Image Inclusion**: All finding images included in exports
+- **Organized Structure**: ZIP exports include organized folder structure
+
+### Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+# API Configuration
+REACT_APP_API_URL=http://localhost:3001/api
+
+# Server Configuration
+PORT=3001
+
+# Database Configuration (optional)
+DB_PATH=./server/assessment_maker.db
+```
+
+## Production Deployment
+
+### Database Backup
 
 ```bash
-# Build React app
-npm run build
+# Export current database
+cd server
+node migrate.js export
 
-# Start Electron with built files
-npm run electron-start
+# The export will be saved as export_localStorage.json
+```
 
-# Build Electron installer
+### Server Deployment
+
+1. Build the React app: `npm run build`
+2. Deploy the `build/` folder and `server/` folder to your server
+3. Install production dependencies: `npm install --production`
+4. Start the server: `npm run server`
+
+### Electron App
+
+```bash
+# Build desktop application
 npm run electron-build
 ```
 
-### Troubleshooting
+## Troubleshooting
 
-#### Windows Issues
+### Common Issues
 
-- **Windows Script Host Error (syntax error)**:
+1. **Server Connection Failed**
 
-  - **NEVER** double-click `electron.js` directly
-  - **ALWAYS** use the npm scripts: `npm run electron-dev` or `npm run start-electron`
-  - If you get "NODE_ENV not recognized", use: `npm run electron-dev-win`
-  - Alternative: Use the provided `start-electron.bat` file by double-clicking it
+   - Check if server is running on port 3001
+   - Verify API_URL in environment variables
+   - App will automatically fall back to localStorage
 
-- **NODE_ENV not recognized**: Use `npm run electron-dev` (with cross-env) instead of setting NODE_ENV manually
+2. **Database Errors**
 
-- **Path issues**: Make sure Node.js and npm are in your PATH
+   - Ensure write permissions in server directory
+   - Check SQLite installation
+   - Delete database file to reset (will lose data)
 
-  - Test with: `node --version` and `npm --version` in Command Prompt
-  - If not found, reinstall Node.js from https://nodejs.org/
+3. **Image Upload Issues**
 
-- **Permission errors**: Run Command Prompt as administrator if needed
+   - Check file size (max 10MB)
+   - Verify file type (images only)
+   - Check server disk space
 
-- **Electron not starting**:
-  - Make sure React dev server is running first (`npm start`)
-  - Wait for "Compiled successfully!" message before starting Electron
-  - Use `npm run start-electron` to start both automatically
+4. **Export Problems**
+   - Ensure all dependencies are installed
+   - Check browser permissions for downloads
+   - Verify export path settings
 
-#### Easy Windows Setup
+### Performance Tips
 
-1. Double-click `start-electron.bat` (recommended for Windows users)
-2. Or use Command Prompt:
-   ```cmd
-   npm install
-   npm run start-electron
-   ```
-
-#### macOS/Linux Issues
-
-- **Permission denied**: Run `chmod +x electron.js` if needed
-- **Node version**: Ensure you're using Node.js v14 or higher
+- **Large Images**: Images are automatically compressed to optimize storage
+- **Database Size**: Use export/import to manage database size
+- **Network**: API calls include error handling and retry logic
 
 ## Contributing
 
@@ -219,12 +263,13 @@ npm run electron-build
 
 ## License
 
-[Add your license information here]
+This project is licensed under the MIT License.
 
 ## Support
 
-For issues and questions, please create an issue in the repository.
+For issues and questions:
 
----
-
-**Note**: This application is designed for professional penetration testing workflows and includes features for comprehensive security assessment documentation.
+1. Check the troubleshooting section
+2. Review the API documentation
+3. Check browser console for errors
+4. Verify server logs for backend issues
