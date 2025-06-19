@@ -187,9 +187,23 @@ app.post("/api/reports/bulk", async (req, res) => {
 
     for (const reportData of reports) {
       try {
+        // Check for ID conflicts and generate new ID if needed
+        let reportId = reportData.id || nanoid();
+        try {
+          const existingReport = await dbHelpers.getReport(reportId);
+          if (existingReport) {
+            reportId = nanoid(); // Generate new ID if conflict exists
+            console.log(
+              `ID conflict detected for ${reportData.projectName}, using new ID: ${reportId}`
+            );
+          }
+        } catch (error) {
+          // Report doesn't exist, which is fine
+        }
+
         const reportWithId = {
-          id: reportData.id || nanoid(),
           ...reportData,
+          id: reportId,
         };
 
         await dbHelpers.createReport(reportWithId);
@@ -475,7 +489,9 @@ app.post("/api/migrate/import", async (req, res) => {
       return res.status(400).json({ error: "No data provided" });
     }
 
-    const result = await migrateFromLocalStorage(JSON.stringify(data));
+    // The migrateFromLocalStorage function expects a JSON string
+    const dataString = typeof data === "string" ? data : JSON.stringify(data);
+    const result = await migrateFromLocalStorage(dataString);
 
     if (result.success) {
       res.json({

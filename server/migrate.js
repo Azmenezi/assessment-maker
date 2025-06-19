@@ -1,13 +1,27 @@
 const { dbHelpers } = require("./database");
 const fs = require("fs");
 const path = require("path");
+const { nanoid } = require("nanoid");
 
 // Migration script to import data from localStorage backup
 async function migrateFromLocalStorage(localStorageData) {
   console.log("Starting migration from localStorage...");
 
   try {
-    const reports = JSON.parse(localStorageData);
+    const parsedData = JSON.parse(localStorageData);
+
+    // Handle both formats: direct array or object with reports property
+    let reports;
+    if (Array.isArray(parsedData)) {
+      reports = parsedData;
+    } else if (parsedData.reports && Array.isArray(parsedData.reports)) {
+      reports = parsedData.reports;
+    } else {
+      throw new Error(
+        "Invalid data format. Expected array of reports or object with reports property."
+      );
+    }
+
     console.log(`Found ${reports.length} reports to migrate`);
 
     for (const report of reports) {
@@ -15,14 +29,28 @@ async function migrateFromLocalStorage(localStorageData) {
         `Migrating report: ${report.projectName} (v${report.version})`
       );
 
-      // Create report in database
-      await dbHelpers.createReport(report);
+      // Check if report with this ID already exists
+      let reportId = report.id;
+      try {
+        const existingReport = await dbHelpers.getReport(reportId);
+        if (existingReport) {
+          // Generate new ID if conflict exists
+          reportId = nanoid();
+          console.log(`  - ID conflict detected, using new ID: ${reportId}`);
+        }
+      } catch (error) {
+        // Report doesn't exist, which is fine
+      }
+
+      // Create report in database with potentially new ID
+      const reportData = { ...report, id: reportId };
+      await dbHelpers.createReport(reportData);
 
       // Create findings for this report
       if (report.detailedFindings) {
         for (const finding of report.detailedFindings) {
           const findingResult = await dbHelpers.createFinding(
-            report.id,
+            reportId, // Use the new report ID
             finding
           );
 

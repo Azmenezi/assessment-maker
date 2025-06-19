@@ -60,11 +60,9 @@ class EncryptionService {
         iterations: this.iterations,
       });
 
-      // Encrypt the data using CBC mode
+      // Encrypt the data using default settings (CBC mode is default)
       const encrypted = CryptoJS.AES.encrypt(plaintext, key, {
         iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7,
       });
 
       // Combine salt, iv, and encrypted data
@@ -117,11 +115,9 @@ class EncryptionService {
         iterations: this.iterations,
       });
 
-      // Decrypt the data using CBC mode
+      // Decrypt the data using default settings
       const decrypted = CryptoJS.AES.decrypt(encrypted, key, {
         iv: iv,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7,
       });
 
       return decrypted.toString(CryptoJS.enc.Utf8);
